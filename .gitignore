@@ -1,3 +1,19 @@
+# Image files
+*.png
+*.gif
+*.pdf
+*.jpg
+*.jpeg
+
+# Data files
+*.nc
+*.p
+
+# Editor files
+*~
+
+#### Below is generated automatically by GitHub for Python repository.
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
