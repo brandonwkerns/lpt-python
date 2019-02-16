@@ -2,6 +2,7 @@ import numpy as np
 from netCDF4 import Dataset
 import struct
 import sys
+import os
 
 """
 This module contains functions for reading external data
@@ -32,6 +33,14 @@ def read_tmpa_hdf(fn):
     DATA['lat'] = np.arange(-49.875, 50.0, 0.25)
     DATA['precip'] = DS['precipitation'][:].T
     DS.close()
+
+    ## Need to get from (-180, 180) to (0, 360) longitude.
+    lon_lt_0, = np.where(DATA['lon'] < -0.0001)
+    lon_ge_0, = np.where(DATA['lon'] > -0.0001)
+    DATA['lon'][lon_lt_0] += 360.0
+    DATA['lon'] = np.concatenate((DATA['lon'][lon_ge_0], DATA['lon'][lon_lt_0]))
+    DATA['precip'] = np.concatenate((DATA['precip'][:,lon_ge_0], DATA['precip'][:,lon_lt_0]), axis=1)
+
     return DATA
 
 
@@ -67,7 +76,40 @@ def read_tmpa_rt_bin(fn):
 
     ## Shape and scale the data.
     DATA['precip'] = np.flip(np.reshape(np.double(DATA['precip']) / 100.0, [480, 1440]), axis=0)
-    DATA['precip'][DATA['precip'] < -0.001] = np.nan
+    DATA['precip'][DATA['precip'] < -0.001] = 0.0 # Usually, missing high latitude data.
     fid.close()
 
+    return DATA
+
+
+def read_tmpa_at_datetime(dt, force_rt_tmpa=False, verbose=False):
+
+    YYYY = dt.strftime("%Y")
+    MM = dt.strftime("%m")
+    DD = dt.strftime("%d")
+    HH = dt.strftime("%H")
+    YMD = YYYY + MM + DD
+
+    ## First try research product
+    fn = ('/home/orca/data/satellite/trmm_global_rainfall/'
+       + YYYY+'/'+MM+'/'+YMD+'/3B42.'+YMD+'.'+HH+'.7.HDF')
+
+    DATA=None
+    if os.path.exists(fn) and not force_rt_tmpa:
+        if verbose:
+            print(fn)
+        DATA=read_tmpa_hdf(fn)
+    else:
+        ## If no research grade, use the research product
+        fn = ('/home/orca/data/satellite/trmm_global_rainfall/rt/'
+           + YYYY+'/'+MM+'/'+YMD+'/3B42RT.'+YMD+HH+'.7.bin')
+
+        ## Sometimes, the file name is "7A" instead of "7".
+        if not os.path.exists(fn):
+            fn = ('/home/orca/data/satellite/trmm_global_rainfall/rt/'
+               + YYYY+'/'+MM+'/'+YMD+'/3B42RT.'+YMD+HH+'.7A.bin')
+
+        if verbose:
+            print(fn)
+        DATA=read_tmpa_rt_bin(fn)
     return DATA
