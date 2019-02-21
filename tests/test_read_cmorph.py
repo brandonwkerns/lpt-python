@@ -1,6 +1,7 @@
 import numpy as np
 from context import lpt
 import matplotlib.pylab as plt
+import datetime as dt
 
 """
 fn = '/home/orca/data/satellite/trmm_global_rainfall/2011/11/20111101/3B42.20111101.06.7.HDF'
@@ -14,12 +15,13 @@ plt.colorbar(H1)
 plt.show()
 """
 
-fnrt = '/home/orca/data/satellite/trmm_global_rainfall/rt/2019/02/20190217/3B42RT.2019021700.7.bin'
-RT = lpt.readdata.read_tmpa_rt_bin(fnrt)
+#fnrt = '/home/orca/data/satellite/cmorph/rt/2019/02/20190217/CMORPH_V0.x_RT_8km-30min_2019021700'
+#RT = lpt.readdata.read_cmorph_rt_bin(fnrt)
+RT = lpt.readdata.read_cmorph_at_datetime(dt.datetime(2019,2,17,0,0,0), verbose=True)
 
 fig = plt.figure()
 ax1 = fig.add_subplot(1,1,1)
 RT['precip'][RT['precip'] < 0.001] = np.NaN
-H2 = ax1.pcolormesh(RT['lon'], RT['lat'], RT['precip'], vmin=0.0, vmax=5.0, cmap='jet')
+H2 = ax1.pcolormesh(RT['lon'], RT['lat'], RT['precip'][0,:,:], vmin=0.0, vmax=5.0, cmap='jet')
 plt.colorbar(H2)
 plt.show()
