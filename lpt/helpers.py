@@ -70,10 +70,6 @@ def gauss_smooth_kernel(nx,ny=-999,stdx=-999,stdy=-999):
     ## Noramlize
     F /= np.sum(F)
 
-    print((stdx,stdx))
-    print(np.power(X,2))
-    print(X)
-    print(Y)
     return F
 
 
@@ -184,7 +180,8 @@ def calc_grid_cell_area(lon, lat):
 
 
 def calculate_lp_object_properties(lon, lat, field, field_accum, label_im
-                        , object_minimum_gridpoints=0, verbose=False):
+                        , object_minimum_gridpoints, end_of_accumulation_time
+                        , verbose=False):
 
     nb_labels = np.max(label_im)
     mask = 1*label_im
@@ -212,10 +209,16 @@ def calculate_lp_object_properties(lon, lat, field, field_accum, label_im
     centroid_y = ndimage.mean(Y2, label_im, range(1, nb_labels + 1))
     area = ndimage.sum(area2d, label_im, range(1, nb_labels + 1))
 
+
+    ## Assign LPT IDs. Order is by longitude. Use zero-base indexing.
+    id0 = 1e10 * end_of_accumulation_time.year + 1e8 * end_of_accumulation_time.month + 1e6 * end_of_accumulation_time.day + 1e4 * end_of_accumulation_time.hour
+
+    id = id0 + np.arange(len(centroid_lon))
+
     ## Prepare output dict.
     OBJ={}
+    OBJ['id'] = id
     OBJ['label_im'] = label_im
-
     OBJ['lon'] = centroid_lon
     OBJ['lat'] = centroid_lat
     OBJ['x'] = centroid_x

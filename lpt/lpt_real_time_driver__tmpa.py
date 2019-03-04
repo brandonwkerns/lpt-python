@@ -19,7 +19,7 @@ filter_stdev = 20 # in terms of number of grid points.
 
 plot_area = [50, 200, -30, 30]
 img_dir = '/home/orca/bkerns/public_html/realtime_mjo_tracking/images/lpt'
-data_dir = '/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data'
+data_dir = '/home/orca/bkerns/public_html/realtime_mjo_tracking/data'
 
 ################################################################################
 
@@ -53,16 +53,10 @@ def cmap_map(function, cmap):
 
     return colors.LinearSegmentedColormap('colormap',cdict,1024)
 
-
-
-
-
-
 year, month, day, hour = dt.datetime.utcnow().timetuple()[0:4]
 hour = int(np.floor(hour/3) * 3)
 
 current_end_of_accumulation_time = dt.datetime(year,month,day,hour,0,0)
-#current_end_of_accumulation_time = dt.datetime(2019,2,10,0,0,0)
 
 ## Check back 24 h from current time.
 for hours_back in range(0,25,data_time_interval):
@@ -73,8 +67,10 @@ for hours_back in range(0,25,data_time_interval):
         YMDH=end_of_accumulation_time.strftime('%Y%m%d%H')
         YMDH_fancy=end_of_accumulation_time.strftime('%Y-%m-%d %H:00 UTC')
 
-        dt_list = [end_of_accumulation_time - dt.timedelta(hours=accumulation_hours)
-                  + dt.timedelta(hours=x) for x in np.double(np.arange(0,accumulation_hours
+        beginning_of_accumulation_time = end_of_accumulation_time - dt.timedelta(hours=accumulation_hours)
+        print((beginning_of_accumulation_time, end_of_accumulation_time))
+        dt_list = [beginning_of_accumulation_time
+         + dt.timedelta(hours=x) for x in np.double(np.arange(0,accumulation_hours
                                               + data_time_interval,data_time_interval))]
 
         ## Get accumulated rain.
@@ -91,13 +87,18 @@ for hours_back in range(0,25,data_time_interval):
         ## Get LP objects.
         label_im = lpt.helpers.identify_lp_objects(DATA_FILTERED, THRESH, verbose=True)
         OBJ = lpt.helpers.calculate_lp_object_properties(DATA_RAW['lon'], DATA_RAW['lat']
-                    , DATA_RAW['precip'], DATA_ACCUM, label_im, verbose=True)
-
-        print(OBJ)
-        print(len(OBJ['lon']))
+                    , DATA_RAW['precip'], DATA_ACCUM, label_im, 0
+                    , end_of_accumulation_time, verbose=True)
 
         ## Output files
-        lpt.io.lp_objects_output_ascii('test.txt',OBJ)
+        objects_dir = (data_dir + '/tmpa/objects/' + str(end_of_accumulation_time.year)
+         + '/' + str(end_of_accumulation_time.month).zfill(2))
+        os.makedirs(objects_dir, exist_ok = True)
+        objects_fn = (objects_dir + '/objects_' + str(end_of_accumulation_time.year)
+         + str(end_of_accumulation_time.month).zfill(2)
+         + str(end_of_accumulation_time.day).zfill(2)
+         + str(end_of_accumulation_time.hour).zfill(2))
+        lpt.lptio.lp_objects_output_ascii(objects_fn, OBJ)
 
         ## Plot
         fig = plt.figure(figsize=(8.5,4))
@@ -106,8 +107,7 @@ for hours_back in range(0,25,data_time_interval):
         map1=lpt.helpers.plot_map_background(plot_area)
         cmap = cmap_map(lambda x: x/2 + 0.5, plt.cm.jet)
         cmap.set_under(color='white')
-        H1 = map1.pcolormesh(DATA_RAW['lon'], DATA_RAW['lat'],DATA_ACCUM, cmap=cmap
-                            , vmin=1, vmax=50)
+        H1 = map1.pcolormesh(DATA_RAW['lon'], DATA_RAW['lat'],DATA_ACCUM, cmap=cmap, vmin=1, vmax=50)
         H2 = plt.contour(DATA_RAW['lon'], DATA_RAW['lat'],DATA_FILTERED, [THRESH,], colors='k', linewidths=1.0)
 
         map1.plot(OBJ['lon'], OBJ['lat'], 'kx', markersize=7)
