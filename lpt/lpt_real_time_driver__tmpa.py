@@ -87,12 +87,19 @@ for hours_back in range(0,25,data_time_interval):
 
         ## Filter the data
         DATA_FILTERED = lpt.helpers.gauss_smooth(DATA_ACCUM, filter_stdev)
-        label_im = lpt.helpers.identify_lp_objects(DATA_FILTERED, THRESH, verbose=True)
 
+        ## Get LP objects.
+        label_im = lpt.helpers.identify_lp_objects(DATA_FILTERED, THRESH, verbose=True)
         OBJ = lpt.helpers.calculate_lp_object_properties(DATA_RAW['lon'], DATA_RAW['lat']
                     , DATA_RAW['precip'], DATA_ACCUM, label_im, verbose=True)
 
+        print(OBJ)
+        print(len(OBJ['lon']))
 
+        ## Output files
+        lpt.io.lp_objects_output_ascii('test.txt',OBJ)
+
+        ## Plot
         fig = plt.figure(figsize=(8.5,4))
 
         ax1 = fig.add_subplot(111)

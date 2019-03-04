@@ -179,28 +179,6 @@ def calc_grid_cell_area(lon, lat):
 
         area = (dlat*111.195) * (dlon*111.195*np.cos(np.pi*lat/180.0))
 
-    """
-    fig=plt.figure(figsize=(10,8))
-    ax1 = fig.add_subplot(221)
-    H1=ax1.pcolormesh(lon)
-    plt.colorbar(H1)
-    ax2 = fig.add_subplot(222)
-    H2=ax2.pcolormesh(lat)
-    plt.colorbar(H2)
-    ax3 = fig.add_subplot(223)
-    H3=ax3.pcolormesh(dlon)
-    plt.colorbar(H3)
-    ax4 = fig.add_subplot(224)
-    H4=ax4.pcolormesh(dlat)
-    plt.colorbar(H4)
-
-    fig=plt.figure(figsize=(10,8))
-    ax11 = fig.add_subplot(111)
-    H11 = ax11.pcolormesh(lon, lat, area)
-    plt.colorbar(H11)
-    plt.show()
-    """
-
     return area
 
 
@@ -221,6 +199,8 @@ def calculate_lp_object_properties(lon, lat, field, field_accum, label_im
         lon2 = lon
         lat2 = lat
 
+    X2, Y2 = np.meshgrid(np.arange(lon2.shape[1]), np.arange(lon2.shape[0]))
+
     area2d = calc_grid_cell_area(lon2, lat2)
 
     sizes = ndimage.sum(mask, label_im, range(1, nb_labels + 1))
@@ -228,6 +208,8 @@ def calculate_lp_object_properties(lon, lat, field, field_accum, label_im
     mean_accum_rain_rate = ndimage.mean(field_accum, label_im, range(1, nb_labels + 1))
     centroid_lon = ndimage.mean(lon2, label_im, range(1, nb_labels + 1))
     centroid_lat = ndimage.mean(lat2, label_im, range(1, nb_labels + 1))
+    centroid_x = ndimage.mean(X2, label_im, range(1, nb_labels + 1))
+    centroid_y = ndimage.mean(Y2, label_im, range(1, nb_labels + 1))
     area = ndimage.sum(area2d, label_im, range(1, nb_labels + 1))
 
     ## Prepare output dict.
@@ -236,6 +218,8 @@ def calculate_lp_object_properties(lon, lat, field, field_accum, label_im
 
     OBJ['lon'] = centroid_lon
     OBJ['lat'] = centroid_lat
+    OBJ['x'] = centroid_x
+    OBJ['y'] = centroid_y
     OBJ['n_points'] = sizes
     OBJ['area'] = area
     OBJ['mean_inst'] = mean_instantaneous_rain_rate
@@ -244,8 +228,10 @@ def calculate_lp_object_properties(lon, lat, field, field_accum, label_im
     return OBJ
 
 
-##
 
+###################################################
+### Plotting functions. ###########################
+###################################################
 def plot_map_background(plotArea=[0,360,-60,60], lon_labels = [1,0,0,0], lat_labels = [0,0,0,1], res='c', anchor='C'
                         , coast_color = 'k', fontsize=10):
     map = Basemap(projection='cyl',resolution=res, anchor=anchor,
