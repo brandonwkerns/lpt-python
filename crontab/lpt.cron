@@ -1,0 +1,5 @@
+#Min H D M DoW /scripts/script.sh
+0 */3 * * * /home/orca/data/satellite/trmm_global_rainfall/wgetscript.rt.crontab >& /home/orca/data/satellite/trmm_global_rainfall/wgetscript.rt.crontab.log
+10 */3 * * * /home/orca/data/satellite/cmorph/wgetscript.rt.crontab >& /home/orca/data/satellite/cmorph/wgetscript.rt.crontab.log
+30 */3 * * * export $DISPLAY=:0 ; /home/orca/bkerns/lib/lpt/lpt-python/lpt/lpt_contab_wrapper.sh >& /home/orca/bkerns/lib/lpt/lpt-python/lpt/run.rt.crontab.log
+#00 14 * * * export $DISPLAY=:0 ; /home/orca/bkerns/lib/lpt/lpt-python/lpt/lpt_contab_wrapper.sh >& /home/orca/bkerns/lib/lpt/lpt-python/lpt/run.rt.crontab.log
