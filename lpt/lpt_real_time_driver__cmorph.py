@@ -58,8 +58,8 @@ hour = int(np.floor(hour/3) * 3)
 
 current_end_of_accumulation_time = dt.datetime(year,month,day,hour,0,0)
 
-## Check back 24 h from current time.
-for hours_back in range(0,720,data_time_interval):
+## Check back 12 h from current time.
+for hours_back in range(0,13,data_time_interval):
 
     try:
         end_of_accumulation_time = current_end_of_accumulation_time - dt.timedelta(hours=hours_back)
@@ -96,13 +96,15 @@ for hours_back in range(0,720,data_time_interval):
 
         ## Output files
         objects_dir = (data_dir + '/cmorph/objects/' + str(end_of_accumulation_time.year)
-         + '/' + str(end_of_accumulation_time.month).zfill(2))
+         + '/' + str(end_of_accumulation_time.month).zfill(2)
+         + '/' + end_of_accumulation_time.strftime('%Y%m%d'))
         os.makedirs(objects_dir, exist_ok = True)
         objects_fn = (objects_dir + '/objects_' + str(end_of_accumulation_time.year)
          + str(end_of_accumulation_time.month).zfill(2)
          + str(end_of_accumulation_time.day).zfill(2)
          + str(end_of_accumulation_time.hour).zfill(2))
         lpt.lptio.lp_objects_output_ascii(objects_fn, OBJ)
+        lpt.lptio.lp_objects_output_netcdf(objects_fn + '.nc', OBJ)
 
         ## Plot
         fig = plt.figure(figsize=(8.5,4))
@@ -111,8 +113,7 @@ for hours_back in range(0,720,data_time_interval):
         map1=lpt.helpers.plot_map_background(plot_area)
         cmap = cmap_map(lambda x: x/2 + 0.5, plt.cm.jet)
         cmap.set_under(color='white')
-        H1 = map1.pcolormesh(DATA_RAW['lon'], DATA_RAW['lat'],DATA_ACCUM, cmap=cmap
-                            , vmin=1, vmax=50)
+        H1 = map1.pcolormesh(DATA_RAW['lon'], DATA_RAW['lat'],DATA_ACCUM, cmap=cmap, vmin=1, vmax=50)
         H2 = plt.contour(DATA_RAW['lon'], DATA_RAW['lat'],DATA_FILTERED, [THRESH,], colors='k', linewidths=1.0)
 
         map1.plot(OBJ['lon'], OBJ['lat'], 'kx', markersize=7)

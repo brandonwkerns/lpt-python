@@ -92,17 +92,19 @@ for hours_back in range(0,25,data_time_interval):
         OBJ = lpt.helpers.calculate_lp_object_properties(DATA_RAW['lon'], DATA_RAW['lat']
                     , DATA_RAW['precip'], DATA_ACCUM, label_im, 0
                     , end_of_accumulation_time, verbose=True)
+        print('objects properties.',flush=True)
 
         ## Output files
         objects_dir = (data_dir + '/tmpa/objects/' + str(end_of_accumulation_time.year)
-         + '/' + str(end_of_accumulation_time.month).zfill(2))
+         + '/' + str(end_of_accumulation_time.month).zfill(2)
+         + '/' + end_of_accumulation_time.strftime('%Y%m%d'))
         os.makedirs(objects_dir, exist_ok = True)
         objects_fn = (objects_dir + '/objects_' + str(end_of_accumulation_time.year)
          + str(end_of_accumulation_time.month).zfill(2)
          + str(end_of_accumulation_time.day).zfill(2)
          + str(end_of_accumulation_time.hour).zfill(2))
         lpt.lptio.lp_objects_output_ascii(objects_fn, OBJ)
-        lpt.lptio.lp_objects_output_netcdf(objects_fn, OBJ, label_im)
+        lpt.lptio.lp_objects_output_netcdf(objects_fn + '.nc', OBJ)
 
         ## Plot
         fig = plt.figure(figsize=(8.5,4))
