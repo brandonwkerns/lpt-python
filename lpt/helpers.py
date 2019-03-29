@@ -1,15 +1,17 @@
 import matplotlib; matplotlib.use('agg')
 import numpy as np
+import datetime as dt
 from scipy.signal import convolve2d
 from scipy import ndimage
 import matplotlib.pylab as plt
 from mpl_toolkits.basemap import Basemap
+from netCDF4 import Dataset
 
 ## These functions are used for LPT.
 
-############################################################################
-######################  Gaussian Smoothing Functions  ######################
-############################################################################
+###################################################################
+######################  LP Object Functions  ######################
+###################################################################
 
 
 def calc_scaled_average(data_in_accumulation_period, factor):
@@ -142,6 +144,51 @@ def calculate_lp_object_properties(lon, lat, field, field_accum, label_im
     return OBJ
 
 
+def get_objid_datetime(objid):
+    """
+    usge: this_datetime = get_objid_datetime(this_objid)
+
+    Get the datetime from an objid of form YYYYMMDDHHnnnn.
+    """
+    ymdh_int = int(np.floor(objid/1e4))
+    ymdh_str = str(ymdh_int)
+    return dt.datetime.strptime(ymdh_str, "%Y%m%d%H")
+
+
+##################################################################
+######################  Tracking Functions  ######################
+##################################################################
+
+def calc_overlapping_points(objid1, objid2, objdir):
+
+    dt1 = get_objid_datetime(objid1)
+    dt2 = get_objid_datetime(objid2)
+
+    fmt = ("/%Y/%m/%Y%m%d/objects_%Y%m%d%H.nc")
+    fn1 = (objdir + dt1.strftime(fmt))
+    fn2 = (objdir + dt2.strftime(fmt))
+
+    DS1 = Dataset(fn1)
+    id1 = DS1['objid'][:]
+    idx1, = np.where(np.abs(id1 - objid1) < 0.1)
+    x1 = DS1['pixels_x'][:][idx1].compressed()
+    y1 = DS1['pixels_y'][:][idx1].compressed()
+    DS1.close()
+
+    DS2 = Dataset(fn2)
+    id2 = DS2['objid'][:]
+    idx2, = np.where(np.abs(id2 - objid2) < 0.1)
+    x2 = DS2['pixels_x'][:][idx2].compressed()
+    y2 = DS2['pixels_y'][:][idx2].compressed()
+    DS2.close()
+
+    xy1 = set(zip(x1,y1))
+    xy2 = set(zip(x2,y2))
+    overlap = [x in xy2 for x in xy1]
+
+    return (len(x1), len(x2), np.sum(overlap))
+
+
 
 ###################################################
 ### Plotting functions. ###########################
@@ -164,3 +211,27 @@ def plot_map_background(plotArea=[0,360,-60,60], lon_labels = [1,0,0,0], lat_lab
 def print_and_save(file_out_base):
     print(file_out_base + '.png')
     plt.savefig(file_out_base + '.png' ,bbox_inches='tight', dpi=150)
+
+
+def get_lpo_mask(objid, objdir):
+
+    dt1 = get_objid_datetime(objid)
+
+    fmt = ("/%Y/%m/%Y%m%d/objects_%Y%m%d%H.nc")
+    fn1 = (objdir + dt1.strftime(fmt))
+
+    DS1 = Dataset(fn1)
+    id1 = DS1['objid'][:]
+    idx1, = np.where(np.abs(id1 - objid) < 0.1)
+
+    x1 = DS1['pixels_x'][:][idx1].compressed()
+    y1 = DS1['pixels_y'][:][idx1].compressed()
+    lon = DS1['grid_lon'][:]
+    lat = DS1['grid_lat'][:]
+
+    DS1.close()
+
+    mask = np.zeros([len(lat), len(lon)])
+    mask[y1,x1] = 1
+
+    return (lon, lat, mask)
