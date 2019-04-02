@@ -12,13 +12,13 @@ plt.close('all')
 """
 Main settings for lpt
 """
-THRESH=14.0
+THRESH=12.0
 accumulation_hours = 72
-data_time_interval = 1
+data_time_interval = 1 #Time resolution of the data in hours.
 filter_stdev = 70 # in terms of number of grid points.
 
 plot_area = [50, 200, -30, 30]
-img_dir = '/home/orca/bkerns/public_html/realtime_mjo_tracking/images/lpt'
+img_dir = '/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/images'
 data_dir = '/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data'
 
 ################################################################################
@@ -59,7 +59,7 @@ hour = int(np.floor(hour/3) * 3)
 current_end_of_accumulation_time = dt.datetime(year,month,day,hour,0,0)
 
 ## Check back 12 h from current time.
-for hours_back in range(0,13,data_time_interval):
+for hours_back in range(0, 13, data_time_interval):
 
     try:
         end_of_accumulation_time = current_end_of_accumulation_time - dt.timedelta(hours=hours_back)
@@ -77,7 +77,8 @@ for hours_back in range(0,13,data_time_interval):
         data_collect = []
         for this_dt in reversed(dt_list):
             DATA_RAW=lpt.readdata.read_cmorph_at_datetime(this_dt, area=[40,210,-40,40], verbose=True)
-            data_collect.append(DATA_RAW['precip'][0,:,:]+DATA_RAW['precip'][1,:,:])
+            data_collect.append(DATA_RAW['precip'][0,:,:])
+            data_collect.append(DATA_RAW['precip'][1,:,:])
         data_collect3d = np.array(data_collect)
         DATA_ACCUM = np.nanmean(data_collect3d,axis=0) * 24.0
         print('Accum done.',flush=True)
@@ -121,7 +122,11 @@ for hours_back in range(0,13,data_time_interval):
 
         ax1.set_title('CMORPH RT 3-Day Rain Rate and LP Objects\n' + YMDH_fancy)
 
-        file_out_base = (img_dir + '/lp_objects_cmorph_rt_' + YMDH)
+        img_dir2 = (img_dir + '/cmorph/objects/' + str(end_of_accumulation_time.year)
+                    + '/' + str(end_of_accumulation_time.month).zfill(2)
+                    + '/' + end_of_accumulation_time.strftime('%Y%m%d'))
+        os.makedirs(img_dir2, exist_ok = True)
+        file_out_base = (img_dir2 + '/lp_objects_cmorph_rt_' + YMDH)
 
         lpt.helpers.print_and_save(file_out_base)
 

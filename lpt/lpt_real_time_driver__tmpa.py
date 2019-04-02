@@ -14,11 +14,11 @@ Main settings for lpt
 """
 THRESH=12.0
 accumulation_hours = 72
-data_time_interval = 3
+data_time_interval = 3 #Time resolution of the data in hours.
 filter_stdev = 20 # in terms of number of grid points.
 
 plot_area = [50, 200, -30, 30]
-img_dir = '/home/orca/bkerns/public_html/realtime_mjo_tracking/images/lpt'
+img_dir = '/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/images'
 data_dir = '/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data'
 
 ################################################################################
@@ -121,7 +121,11 @@ for hours_back in range(0,25,data_time_interval):
 
         ax1.set_title('TMPA RT 3-Day Rain Rate and LP Objects\n' + YMDH_fancy)
 
-        file_out_base = (img_dir + '/lp_objects_tmpa_rt_' + YMDH)
+        img_dir2 = (img_dir + '/tmpa/objects/' + str(end_of_accumulation_time.year)
+                    + '/' + str(end_of_accumulation_time.month).zfill(2)
+                    + '/' + end_of_accumulation_time.strftime('%Y%m%d'))
+        os.makedirs(img_dir2, exist_ok = True)
+        file_out_base = (img_dir2 + '/lp_objects_tmpa_rt_' + YMDH)
 
         lpt.helpers.print_and_save(file_out_base)
 
