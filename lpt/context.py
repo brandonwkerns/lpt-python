@@ -8,3 +8,4 @@ import lpt
 import lpt.helpers
 import lpt.readdata
 import lpt.lptio
+import lpt.plotting
