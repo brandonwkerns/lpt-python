@@ -100,7 +100,7 @@ for hours_back in range(0, hours_to_go_back+1, data_time_interval):
         ## Plot
         plt.clf()
         ax1 = fig.add_subplot(111)
-        map1=lpt.helpers.plot_map_background(plot_area)
+        map1=lpt.plotting.plot_map_background(plot_area)
         cmap = lpt.plotting.cmap_map(lambda x: x/2 + 0.5, plt.cm.jet)
         cmap.set_under(color='white')
         H1 = map1.pcolormesh(DATA_RAW['lon'], DATA_RAW['lat'],DATA_ACCUM, cmap=cmap, vmin=1, vmax=50)
@@ -117,7 +117,7 @@ for hours_back in range(0, hours_to_go_back+1, data_time_interval):
         os.makedirs(img_dir2, exist_ok = True)
         file_out_base = (img_dir2 + '/lp_objects_cmorph_rt_' + YMDH)
 
-        lpt.helpers.print_and_save(file_out_base)
+        lpt.plotting.print_and_save(file_out_base)
         plt.clf()
 
     except FileNotFoundError:

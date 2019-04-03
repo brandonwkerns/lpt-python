@@ -4,7 +4,6 @@ import datetime as dt
 from scipy.signal import convolve2d
 from scipy import ndimage
 import matplotlib.pylab as plt
-from mpl_toolkits.basemap import Basemap
 from netCDF4 import Dataset
 
 ## These functions are used for LPT.
@@ -503,24 +502,6 @@ def calc_lpt_system_group_properties_with_branches(LPT_with_branches, options):
 ###################################################
 ### Plotting functions. ###########################
 ###################################################
-def plot_map_background(plotArea=[0,360,-60,60], lon_labels = [1,0,0,0], lat_labels = [0,0,0,1], res='c', anchor='C'
-                        , coast_color = 'k', fontsize=10):
-    map = Basemap(projection='cyl',resolution=res, anchor=anchor,
-                  llcrnrlat = plotArea[2],
-                  urcrnrlat = plotArea[3],
-                  llcrnrlon = plotArea[0],
-                  urcrnrlon = plotArea[1]);
-
-    #map.fillcontinents(color='lightgray', lake_color='lightgray')
-    map.drawcoastlines(linewidth=0.5, color=coast_color) ;
-    map.drawparallels(np.arange(-80,81,20), linewidth=0.5, labels = lon_labels, fontsize = fontsize);
-    map.drawmeridians(np.arange(0,361,20), linewidth=0.5, labels = lat_labels, fontsize = fontsize);
-
-    return map ;
-
-def print_and_save(file_out_base):
-    print(file_out_base + '.png')
-    plt.savefig(file_out_base + '.png' ,bbox_inches='tight', dpi=150)
 
 
 def get_lpo_mask(objid, objdir):
