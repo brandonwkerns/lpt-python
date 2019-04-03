@@ -84,7 +84,10 @@ for hours_back in range(0, hours_to_go_back+1, data_time_interval):
                     , end_of_accumulation_time, verbose=True)
         print('objects properties.',flush=True)
 
-        ## Output files
+
+        """
+        Object Output files
+        """
         objects_dir = (data_dir + '/cmorph/objects/' + str(end_of_accumulation_time.year)
          + '/' + str(end_of_accumulation_time.month).zfill(2)
          + '/' + end_of_accumulation_time.strftime('%Y%m%d'))
@@ -97,18 +100,14 @@ for hours_back in range(0, hours_to_go_back+1, data_time_interval):
         if (len(OBJ['n_points']) > 0):
             lpt.lptio.lp_objects_output_netcdf(objects_fn + '.nc', OBJ)
 
-        ## Plot
+        """
+        Object Plot
+        """
         plt.clf()
         ax1 = fig.add_subplot(111)
-        map1=lpt.plotting.plot_map_background(plot_area)
-        cmap = lpt.plotting.cmap_map(lambda x: x/2 + 0.5, plt.cm.jet)
-        cmap.set_under(color='white')
-        H1 = map1.pcolormesh(DATA_RAW['lon'], DATA_RAW['lat'],DATA_ACCUM, cmap=cmap, vmin=1, vmax=50)
-        H2 = plt.contour(DATA_RAW['lon'], DATA_RAW['lat'],DATA_FILTERED, [THRESH,], colors='k', linewidths=1.0)
-
-        map1.plot(OBJ['lon'], OBJ['lat'], 'kx', markersize=7)
-        plt.colorbar(H1)
-
+        lpt.plotting.plot_rain_map_with_filtered_contour(ax1
+                , DATA_ACCUM, OBJ
+                , plot_area = plot_area)
         ax1.set_title('CMORPH RT 3-Day Rain Rate and LP Objects\n' + YMDH_fancy)
 
         img_dir2 = (img_dir + '/cmorph/objects/' + str(end_of_accumulation_time.year)

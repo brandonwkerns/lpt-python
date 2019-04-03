@@ -69,11 +69,29 @@ def print_and_save(file_out_base):
     plt.savefig(file_out_base + '.png' ,bbox_inches='tight', dpi=150)
 
 
+"""
+####################################################################
+## High level plotting functions follow below.
+####################################################################
+"""
 
+def plot_rain_map_with_filtered_contour(ax, DATA_ACCUM, OBJ, plot_area=[50, 200, -30, 30]):
+    lon = OBJ['grid']['lon']
+    lat = OBJ['grid']['lat']
 
+    map1 = plot_map_background(plot_area)
+    cmap = cmap_map(lambda x: x/2 + 0.5, plt.cm.jet)
+    cmap.set_under(color='white')
+    H1 = map1.pcolormesh(lon, lat, DATA_ACCUM, cmap=cmap, vmin=1, vmax=50)
 
-def plot_rain_map_with_filtered_contour(ax):
-    pass
+    label_im = np.array(OBJ['label_im'])
+    label_im[label_im > 0.5] = 1
+    Hobj = plt.contour(lon, lat, label_im, [0.5,], colors='k', linewidths=1.0)
+
+    map1.plot(OBJ['lon'], OBJ['lat'], 'kx', markersize=7)
+    CB = plt.colorbar(H1)
+    return (map1, H1, Hobj, CB)
+
 
 def plot_rain_map_with_lpt_history_and_contour(ax):
     pass
