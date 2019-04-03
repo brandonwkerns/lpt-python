@@ -25,36 +25,6 @@ data_dir = '/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data'
 
 ################################################################################
 
-def cmap_map(function, cmap):
-    """ Applies function (which should operate on vectors of shape 3: [r, g, b]), on colormap cmap.
-    This routine will break any discontinuous points in a colormap.
-    """
-    cdict = cmap._segmentdata
-    step_dict = {}
-    # Firt get the list of points where the segments start or end
-    for key in ('red', 'green', 'blue'):
-        step_dict[key] = list(map(lambda x: x[0], cdict[key]))
-    step_list = sum(step_dict.values(), [])
-    step_list = np.array(list(set(step_list)))
-    # Then compute the LUT, and apply the function to the LUT
-    reduced_cmap = lambda step : np.array(cmap(step)[0:3])
-    old_LUT = np.array(list(map(reduced_cmap, step_list)))
-    new_LUT = np.array(list(map(function, old_LUT)))
-    # Now try to make a minimal segment definition of the new LUT
-    cdict = {}
-    for i, key in enumerate(['red','green','blue']):
-        this_cdict = {}
-        for j, step in enumerate(step_list):
-            if step in step_dict[key]:
-                this_cdict[step] = new_LUT[j, i]
-            elif new_LUT[j,i] != old_LUT[j, i]:
-                this_cdict[step] = new_LUT[j, i]
-        colorvector = list(map(lambda x: x + (x[1], ), this_cdict.items()))
-        colorvector.sort()
-        cdict[key] = colorvector
-
-    return colors.LinearSegmentedColormap('colormap',cdict,1024)
-
 ## Use current real time, or specified time from the command line args.
 if len(sys.argv) < 2:
     base_time = dt.datetime.utcnow()
@@ -92,11 +62,11 @@ for hours_back in range(0, hours_to_go_back+1, data_time_interval):
         data_collect = []
         count = 0
         for this_dt in reversed(dt_list):
-            DATA_RAW=lpt.readdata.read_cmorph_at_datetime(this_dt, area=[40,210,-40,40], verbose=True)
+            DATA_RAW=lpt.readdata.read_tmpa_at_datetime(this_dt, verbose=True)
             if count < 1:
-                data_collect = np.array(0.5*(DATA_RAW['precip'][0,:,:] + DATA_RAW['precip'][1,:,:]))
+                data_collect = np.array(DATA_RAW['precip'])
             else:
-                data_collect += np.array(0.5*(DATA_RAW['precip'][0,:,:] + DATA_RAW['precip'][1,:,:]))
+                data_collect += np.array(DATA_RAW['precip'])
             count += 1
 
         DATA_ACCUM = (data_collect/count) * 24.0 # Get the mean in mm/day.
@@ -131,7 +101,7 @@ for hours_back in range(0, hours_to_go_back+1, data_time_interval):
         plt.clf()
         ax1 = fig.add_subplot(111)
         map1=lpt.helpers.plot_map_background(plot_area)
-        cmap = cmap_map(lambda x: x/2 + 0.5, plt.cm.jet)
+        cmap = lpt.plotting.cmap_map(lambda x: x/2 + 0.5, plt.cm.jet)
         cmap.set_under(color='white')
         H1 = map1.pcolormesh(DATA_RAW['lon'], DATA_RAW['lat'],DATA_ACCUM, cmap=cmap, vmin=1, vmax=50)
         H2 = plt.contour(DATA_RAW['lon'], DATA_RAW['lat'],DATA_FILTERED, [THRESH,], colors='k', linewidths=1.0)
