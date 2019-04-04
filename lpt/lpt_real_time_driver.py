@@ -27,8 +27,8 @@ def lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,argv):
     current_end_of_accumulation_time = dt.datetime(year, month, day, hour, 0, 0)
 
     if plotting['do_plotting']:
-        fig1 = plt.figure(figsize = (8.5,4))
-        fig2 = plt.figure(figsize = (8.5,11))
+        fig1 = plt.figure(1, figsize = (8.5,4))
+        fig2 = plt.figure(2, figsize = (8.5,11))
 
     ## Check back 24 h from current time.
     for hours_back in range(0, hours_to_go_back+1, dataset['data_time_interval']):
@@ -90,6 +90,7 @@ def lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,argv):
             Object Plot
             """
             if plotting['do_plotting']:
+                plt.figure(1)
                 fig1.clf()
                 ax1 = fig1.add_subplot(111)
                 lpt.plotting.plot_rain_map_with_filtered_contour(ax1
@@ -169,7 +170,7 @@ def lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,argv):
     """
 
     if plotting['do_plotting']:
-
+        plt.figure(2)
         fig2.clf()
         ax2 = fig2.add_subplot(111)
 
