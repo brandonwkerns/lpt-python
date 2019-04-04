@@ -5,6 +5,7 @@ from scipy.signal import convolve2d
 from scipy import ndimage
 import matplotlib.pylab as plt
 from netCDF4 import Dataset
+import glob
 
 ## These functions are used for LPT.
 
@@ -173,6 +174,12 @@ def read_lp_object_properties(objid, objdir, property_list, verbose=False):
     DS1.close()
 
     return out_dict
+
+
+def get_latest_lp_object_time(objdir):
+    obj_file_list = sorted(glob.glob((objdir + "/????/??/????????/*.nc")))
+    last_obj_file = obj_file_list[-1]
+    return dt.datetime.strptime(last_obj_file[-13:-3], "%Y%m%d%H")
 
 
 ##################################################################
@@ -500,7 +507,7 @@ def calc_lpt_system_group_properties_with_branches(LPT_with_branches, options):
 
 
 ###################################################
-### Plotting functions. ###########################
+### Other processing functions. ###########################
 ###################################################
 
 

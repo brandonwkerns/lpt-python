@@ -7,117 +7,75 @@ import sys
 import os
 import matplotlib.colors as colors
 import scipy.ndimage
+from lpt_real_time_driver import *
 
 plt.close('all')
 plt.ioff()
 
 """
+**** Real-time LPT driver script for CMORPH RT data. ****
+
+If no command line arguements, it uses the latest data closest to real time.
+The date and how far back to calculate can be specified on the command line
+which can be useful for filling in previous/missing data.
+
+Example usage:
+   python lpt_real_time_driver__cmorph.py
+   python lpt_real_time_driver__cmorph.py 2019040100 72
+
+
+*** Note: raw data directory on your system is set in readdata.py ***
+*** Note: the "72" back filling time is for updating LP Objects.  ***
+***    LPT goes back "history_length" specified below.            ***
+"""
+
+"""
+Dataset Case Settings
+"""
+dataset={}
+dataset['label'] = 'cmorph'
+dataset['raw_data_parent_dir'] = '/home/orca/data/satellite/cmorph/'
+dataset['sub_directory_format'] = '%Y/%m/%Y%m%d'
+dataset['data_time_interval'] = 1           # Time resolution of the data in hours.
+dataset['read_function'] = lpt.readdata.read_cmorph_at_datetime
+dataset['verbose'] = True
+dataset['sub_area'] = [40,210,-40,40] # Use for CMORPH only. Very slow if you use full global data.
+
+"""
 Main settings for lpt
 """
-THRESH=12.0
-accumulation_hours = 72
-data_time_interval = 1 #Time resolution of the data in hours.
-filter_stdev = 70 # in terms of number of grid points.
+## Plot settings.
+plotting = {}
+plotting['do_plotting'] = True               # True or False -- Should I make plots?
+plotting['plot_area'] = [50, 200, -30, 30]   # Plotting area for maps.
+plotting['time_lon_range'] = [40, 200]       # Longitude Range for time-longitude plots.
 
-plot_area = [50, 200, -30, 30]
-img_dir = '/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/images'
-data_dir = '/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data'
+## High level output directories. Images and data will go in here.
+output={}
+output['img_dir'] = '/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/images'
+output['data_dir'] = '/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data'
+output['sub_directory_format'] = '%Y/%m/%Y%m%d'
 
-################################################################################
+## LP Object settings
+lpo_options={}
+lpo_options['thresh'] = 12.0                 # LP Objects threshold
+lpo_options['accumulation_hours'] = 72       # Accumulation period for LP objects.
+lpo_options['filter_stdev'] = 70             # Gaussian filter width, in terms of grid points.
 
-## Use current real time, or specified time from the command line args.
-if len(sys.argv) < 2:
-    base_time = dt.datetime.utcnow()
-else:
-    base_time = dt.datetime.strptime(str(sys.argv[1]), '%Y%m%d%H') # command line arg #1 format: YYYYMMDDHH
-
-if len(sys.argv) < 3:
-    hours_to_go_back = 12
-else:
-    hours_to_go_back = int(sys.argv[2]) # command line arg #2: hours to go back.
-
-year, month, day, hour = base_time.timetuple()[0:4]
-hour = int(np.floor(hour))
-
-current_end_of_accumulation_time = dt.datetime(year,month,day,hour,0,0)
-
-fig = plt.figure(figsize=(8.5,4))
-
-## Check back 12 h from current time.
-for hours_back in range(0, hours_to_go_back+1, data_time_interval):
-
-    try:
-        end_of_accumulation_time = current_end_of_accumulation_time - dt.timedelta(hours=hours_back)
-
-        YMDH=end_of_accumulation_time.strftime('%Y%m%d%H')
-        YMDH_fancy=end_of_accumulation_time.strftime('%Y-%m-%d %H:00 UTC')
-
-        beginning_of_accumulation_time = end_of_accumulation_time - dt.timedelta(hours=accumulation_hours)
-        print((beginning_of_accumulation_time, end_of_accumulation_time))
-        dt_list = [beginning_of_accumulation_time
-            + dt.timedelta(hours=x) for x in np.double(np.arange(0,accumulation_hours
-                                              + data_time_interval,data_time_interval))]
-
-        ## Get accumulated rain.
-        data_collect = []
-        count = 0
-        for this_dt in reversed(dt_list):
-            DATA_RAW=lpt.readdata.read_cmorph_at_datetime(this_dt, area=[40,210,-40,40], verbose=True)
-            if count < 1:
-                data_collect = np.array(0.5*(DATA_RAW['precip'][0,:,:] + DATA_RAW['precip'][1,:,:]))
-            else:
-                data_collect += np.array(0.5*(DATA_RAW['precip'][0,:,:] + DATA_RAW['precip'][1,:,:]))
-            count += 1
-
-        DATA_ACCUM = (data_collect/count) * 24.0 # Get the mean in mm/day.
-        print('Accum done.',flush=True)
-
-        ## Filter the data
-        DATA_FILTERED = scipy.ndimage.gaussian_filter(DATA_ACCUM, filter_stdev
-            , order=0, output=None, mode='reflect', cval=0.0, truncate=3.0)
-        print('filter done.',flush=True)
-
-        ## Get LP objects.
-        label_im = lpt.helpers.identify_lp_objects(DATA_FILTERED, THRESH, verbose=True)
-        OBJ = lpt.helpers.calculate_lp_object_properties(DATA_RAW['lon'], DATA_RAW['lat']
-                    , DATA_RAW['precip'], DATA_ACCUM, label_im, 0
-                    , end_of_accumulation_time, verbose=True)
-        print('objects properties.',flush=True)
+## LPT Settings
+lpt_options={}
+lpt_options['do_lpt_calc'] = True
+#lpt_options['do_lpt_calc'] = False
+lpt_options['lpt_history_days'] = 60          # How many days to go back for LPT tracking and time-lon plot.
+lpt_options['min_overlap_points'] = 48000      # LP object connectivity is based on points
+lpt_options['min_overlap_frac'] = 0.5         # -- OR fraction of either LP object.
+lpt_options['min_lp_objects_points'] = 1200    # Disregard LP objects smaller than this.
+lpt_options['min_lpt_duration_hours'] = 7*24  # Minumum duration to keep it as an LPT
+lpt_options['center_jump_max_hours'] = 3*24   # How long to allow center jumps
 
 
-        """
-        Object Output files
-        """
-        objects_dir = (data_dir + '/cmorph/objects/' + str(end_of_accumulation_time.year)
-         + '/' + str(end_of_accumulation_time.month).zfill(2)
-         + '/' + end_of_accumulation_time.strftime('%Y%m%d'))
-        os.makedirs(objects_dir, exist_ok = True)
-        objects_fn = (objects_dir + '/objects_' + str(end_of_accumulation_time.year)
-         + str(end_of_accumulation_time.month).zfill(2)
-         + str(end_of_accumulation_time.day).zfill(2)
-         + str(end_of_accumulation_time.hour).zfill(2))
-        lpt.lptio.lp_objects_output_ascii(objects_fn, OBJ)
-        if (len(OBJ['n_points']) > 0):
-            lpt.lptio.lp_objects_output_netcdf(objects_fn + '.nc', OBJ)
+"""
+Call the real time driver function.
+"""
 
-        """
-        Object Plot
-        """
-        plt.clf()
-        ax1 = fig.add_subplot(111)
-        lpt.plotting.plot_rain_map_with_filtered_contour(ax1
-                , DATA_ACCUM, OBJ
-                , plot_area = plot_area)
-        ax1.set_title('CMORPH RT 3-Day Rain Rate and LP Objects\n' + YMDH_fancy)
-
-        img_dir2 = (img_dir + '/cmorph/objects/' + str(end_of_accumulation_time.year)
-                    + '/' + str(end_of_accumulation_time.month).zfill(2)
-                    + '/' + end_of_accumulation_time.strftime('%Y%m%d'))
-        os.makedirs(img_dir2, exist_ok = True)
-        file_out_base = (img_dir2 + '/lp_objects_cmorph_rt_' + YMDH)
-
-        lpt.plotting.print_and_save(file_out_base)
-        plt.clf()
-
-    except FileNotFoundError:
-        print('Data not yet available up to this point. Skipping.')
+lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,sys.argv)

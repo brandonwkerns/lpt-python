@@ -2,6 +2,8 @@ import matplotlib; matplotlib.use('agg')
 import numpy as np
 import numpy.ma as ma
 from netCDF4 import Dataset
+import os
+import os.path
 
 ###################################################
 ### Output functions
@@ -111,25 +113,21 @@ def lpt_system_tracks_output_ascii(fn, TIMECLUSTERS):
     to an ascii file.
     """
     print('Writing LPT system track ASCII output to: ' + fn)
-    #fmt = '%7.2f%8.2f%7.1f%7.1f%20.1f   %16d\n'
     fmt='        %4d%02d%02d%02d %8d %10.2f %10.2f %2d\n'
-    file = open(fn, 'w')
 
+    os.makedirs(os.path.dirname(fn), exist_ok=True) # Make directory if needed.
+    file = open(fn, 'w')
 
     ## Header
     file.write("LPT nnnn.nn\n")
     file.write("        YYYYMMDDHH _A_[km2] cen_lat.__ cen_lon.__ Nobj\n")
 
-
     ## Data
     for ii in range(len(TIMECLUSTERS)):
-
         file.write("LPT %07.2f\n" % (ii,))
 
         for tt in range(len(TIMECLUSTERS[ii]['datetime'])):
-
             year,month,day,hour = TIMECLUSTERS[ii]['datetime'][tt].timetuple()[0:4]
-
             file.write(fmt % (year,month,day,hour
                                 , TIMECLUSTERS[ii]['area'][tt]
                                 , TIMECLUSTERS[ii]['centroid_lat'][tt]

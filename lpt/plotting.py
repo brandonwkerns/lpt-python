@@ -93,11 +93,24 @@ def plot_rain_map_with_filtered_contour(ax, DATA_ACCUM, OBJ, plot_area=[50, 200,
     return (map1, H1, Hobj, CB)
 
 
-def plot_rain_map_with_lpt_history_and_contour(ax):
-    pass
+def plot_timelon_with_lpt(ax2, dt_list, lon, timelon_rain, TIMECLUSTERS, lon_range):
 
-def plot_rain_time_longitude(ax):
-    pass
+    cmap = cmap_map(lambda x: x/2 + 0.5, plt.cm.jet)
+    cmap.set_under(color='white')
+    timelon_rain = np.array(timelon_rain)
+    timelon_rain[timelon_rain < 0.1] = np.nan
+    Hrain = ax2.pcolormesh(lon, dt_list, timelon_rain, vmin=0.0, vmax=1.5, cmap=cmap)
+    cbar = plt.colorbar(Hrain)
 
-def plot_lpt_systems_time_longitude(ax):
-    pass
+    for ii in range(len(TIMECLUSTERS)):
+        x = TIMECLUSTERS[ii]['centroid_lon']
+        y = TIMECLUSTERS[ii]['datetime']
+        ax2.plot(x, y, 'k', linewidth=1.5)
+
+        ax2.text(x[0], y[0], str(int(ii)), fontweight='bold', color='red',clip_on=True)
+        ax2.text(x[-1], y[-1], str(int(ii)), fontweight='bold', color='red',clip_on=True)
+
+    ax2.set_xlim(lon_range)
+    ax2.set_ylim([dt_list[0], dt_list[-1]])
+
+    return (Hrain)

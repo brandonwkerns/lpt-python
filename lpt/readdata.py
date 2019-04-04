@@ -61,6 +61,7 @@ def read_cmorph_rt_bin(fn, area=[0,360,-90,90]):
     DATA['lon'] = DATA['lon'][keep_lon[0]:keep_lon[-1]]
     DATA['lat'] = DATA['lat'][keep_lat[0]:keep_lat[-1]]
     DATA['precip'] = DATA['precip'][:, keep_lat[0]:keep_lat[-1], keep_lon[0]:keep_lon[-1]]
+    DATA['precip'] = 0.5*(DATA['precip'][0,:,:] + DATA['precip'][1,:,:])
 
     return DATA
 
