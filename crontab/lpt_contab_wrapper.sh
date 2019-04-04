@@ -29,18 +29,7 @@ ln -s `find cmorph/objects/*/*/* | grep .png | tail -73 ` .
 /usr/bin/convert -delay 20 *.png lp_objects_cmorph_rt_LAST3DAYS.gif
 rm *.png
 
-
-#file_list=`ls -1 lp_objects_cmorph_rt_*.png | tail -73 | tr '\n' ' '`
-#/usr/bin/convert -delay 10 $file_list lp_objects_cmorph_rt_LAST3DAYS.gif
-
 # Last 10 days
-
-#file_list=`ls -1 lp_objects_tmpa_rt_*.png | tail -81 | tr '\n' ' '`
-#/usr/bin/convert -delay 20 $file_list lp_objects_tmpa_rt_LAST10DAYS.gif
-
-#file_list=`ls -1 lp_objects_cmorph_rt_*.png | tail -241 | tr '\n' ' '`
-#/usr/bin/convert -delay 10 $file_list lp_objects_cmorph_rt_LAST10DAYS.gif
-
 
 ln -s `find tmpa/objects/*/*/* | grep .png | tail -81 ` .
 /usr/bin/convert -delay 20 *.png lp_objects_tmpa_rt_LAST10DAYS.gif

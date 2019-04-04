@@ -12,14 +12,14 @@ Python version of LPT. Geared for real time use at NCEP.
 ## Code organization:
 - Real time data download scripts, crontab setup, and log files are in crontab/.
 - The main code directory is lpt/.
- - Functions for reading data are in lpt/eaddata.py.
- - Functions for LP object and LPTs input/output are in lpt/io.py.
- - Supporting functions for calculations are in lpt/helpers.py.
- - Plotting functions are in lpt/plotting.py
- - The following driver scripts are included in lpt/:
-  - lpt_real_time_driver_tmpa.py
-  - lpt_real_time_driver_cmorph.py
-   - lpt_real_time_driver.py  (The "master" real time driver function, called by the above two.)
+  * Functions for reading data are in lpt/eaddata.py.
+  * Functions for LP object and LPTs input/output are in lpt/io.py.
+  * Supporting functions for calculations are in lpt/helpers.py.
+  * Plotting functions are in lpt/plotting.py
+  * The following driver scripts are included in lpt/:
+    + lpt_real_time_driver_tmpa.py
+    + lpt_real_time_driver_cmorph.py
+    + lpt_real_time_driver.py  (The "master" real time driver function, called by the above two.)
 - Some test scripts are under tests/ directory. Mainly used for development purposes.
 
 ## Setting up LPT on a new system:
