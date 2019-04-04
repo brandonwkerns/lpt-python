@@ -17,6 +17,7 @@ def lp_objects_output_ascii(fn, OBJ):
     fmt = '%7.2f%8.2f%7.1f%7.1f%20.1f   %16d\n'
     file = open(fn, 'w')
 
+    file.write(' lat.__  lon.__    y._    x._         area[km2]._     YYYYMMDDHHnnnn\n') # Header line.
     for ii in range(len(OBJ['lon'])):
 
         print(fmt % (OBJ['lat'][ii], OBJ['lon'][ii],
