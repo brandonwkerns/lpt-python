@@ -1,1 +1,3 @@
 This directory contains the LPT driver scripts and helper functions.
+
+First copy the *.MASTER.py files to *.py files. Do not modify the MASTER files.
