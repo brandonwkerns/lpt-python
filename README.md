@@ -52,7 +52,7 @@ can feel free to modify. See README files in the lpt/ and crontab/ directories.
 - The repository is in /home/orca/bkerns/lib/lpt/lpt-python
 - TMPA data are downloaded to /home/orca/data/satellite/trmm_global_rainfall
 - CMORPH data are downloaded to /home/orca/data/satellite/cmorph
-- Digital data from LPT code is saved under
+- Digital data from LPT code is saved under /home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data/
 
 
 I used Anaconda Python 3.6.2 with the following environment:
