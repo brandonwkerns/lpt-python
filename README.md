@@ -26,7 +26,7 @@ can feel free to modify. See README files in the lpt/ and crontab/ directories.
   * The following driver scripts are included in lpt/:
     + lpt_real_time_driver_tmpa.py
     + lpt_real_time_driver_cmorph.py
-    + lpt_real_time_driver.py  (The "master" real time driver function, called by the above two.)
+    + lpt_real_time_driver.py  (The "slave" real time driver function, called by the above two.)
 - Some test scripts are under tests/ directory. Mainly used for development purposes.
 
 
