@@ -50,6 +50,7 @@ Python version of LPT. Geared for real time use at NCEP.
 
 I used Anaconda Python 3.6.2 with the following environment:
 
+```
  $ conda list                                                                                                          [12:34:44]
    packages in environment at /home/disk/atmos/bkerns/anaconda3/envs/meteo:  
 backports                 1.0                      py36_1    conda-forge  
@@ -142,3 +143,4 @@ xorg-libxau               1.0.8                         3    conda-forge
 xorg-libxdmcp             1.1.2                         3    conda-forge
 xz                        5.2.4                h470a237_1    conda-forge
 zlib                      1.2.11                        0    conda-forge
+```
