@@ -1,28 +1,28 @@
 # lpt-python
 Python version of LPT. Geared for real time use at NCEP.
 
-This version DOES NOT yet include splitting up LPT system groups in to track branches.
-This version DOES NOT yet include MJO identification.
+*This version DOES NOT yet include splitting up LPT system groups in to track branches.*
+*This version DOES NOT yet include MJO identification.*
 
-Python module dependencies (see below for full environment I used):
+## Python module dependencies (see below for full environment I used):
 - numpy
 - scipy.signal, scipy.ndimage
 - NetCDF4.Dataset
 
-Code organization:
+## Code organization:
 - Real time data download scripts, crontab setup, and log files are in crontab/.
 - The main code directory is lpt/.
--- Functions for reading data are in lpt/eaddata.py.
--- Functions for LP object and LPTs input/output are in lpt/io.py.
--- Supporting functions for calculations are in lpt/helpers.py.
--- Plotting functions are in lpt/plotting.py
--- The following driver scripts are included in lpt/:
-++ lpt_real_time_driver_tmpa.py
-++ lpt_real_time_driver_cmorph.py
-++++ lpt_real_time_driver.py  (The "master" real time driver function, called by the above two.)
+ - Functions for reading data are in lpt/eaddata.py.
+ - Functions for LP object and LPTs input/output are in lpt/io.py.
+ - Supporting functions for calculations are in lpt/helpers.py.
+ - Plotting functions are in lpt/plotting.py
+ - The following driver scripts are included in lpt/:
+  - lpt_real_time_driver_tmpa.py
+  - lpt_real_time_driver_cmorph.py
+   - lpt_real_time_driver.py  (The "master" real time driver function, called by the above two.)
 - Some test scripts are under tests/ directory. Mainly used for development purposes.
 
-Setting up LPT on a new system:
+## Setting up LPT on a new system:
 1) Clone this repository to your system, or download the zip file format.
 2) First, set the data download directories and crontab directories in the crontab/ directory.
    Set the same directory as dataset['raw_data_parent_dir'] in the driver scripts
@@ -37,7 +37,7 @@ Setting up LPT on a new system:
     (crontab lpt.cron()
 
 -------------------------------------------------------------------------------
-In my implementation:
+## In my implementation:
 - The repository is in /home/orca/bkerns/lib/lpt/lpt-python
 - TMPA data are downloaded to /home/orca/data/satellite/trmm_global_rainfall
 - CMORPH data are downloaded to /home/orca/data/satellite/cmorph
@@ -46,8 +46,7 @@ In my implementation:
 I used Anaconda Python 3.6.2 with the following environment:
 
  $ conda list                                                                                                          [12:34:44]
-# packages in environment at /home/disk/atmos/bkerns/anaconda3/envs/meteo:
-#
+   packages in environment at /home/disk/atmos/bkerns/anaconda3/envs/meteo:
 backports                 1.0                      py36_1    conda-forge
 backports.functools_lru_cache 1.5                      py36_0    conda-forge
 basemap                   1.1.0                    py36_4    conda-forge
