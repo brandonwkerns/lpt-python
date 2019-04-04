@@ -4,6 +4,11 @@ Python version of LPT. Geared for real time use at NCEP.
 *This version DOES NOT yet include splitting up LPT system groups in to track branches.*  
 *This version DOES NOT yet include MJO identification.*
 
+## MASTER files.
+__Please do not modify the MASTER files.__ They are Github repository files
+and can be updated with `git pull`. Instead, copy them to local files which you
+can feel free to modify. See README files in the lpt/ and crontab/ directories.
+
 
 ## Python module dependencies (see below for full environment I used):
 - numpy
