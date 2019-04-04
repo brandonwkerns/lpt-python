@@ -45,6 +45,9 @@ do
   convert $ff \( +clone -set delay 100 \) +swap +delete $ff
 done
 
+## Get latest time-longitude plots.
+ln -sf `find tmpa/systems/*/*/* | grep .png | tail -1 ` lpt_time_lon_tmpa_LATEST.png
+ln -sf `find cmorph/systems/*/*/* | grep .png | tail -1 ` lpt_time_lon_cmorph_LATEST.png 
 
 
 
