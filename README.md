@@ -32,17 +32,19 @@ can feel free to modify. See README files in the lpt/ and crontab/ directories.
 
 ## Setting up LPT on a new system:
 1) Clone this repository to your system, or download the zip file format.
-2) First, set the data download directories and crontab directories in the crontab/ directory.
-   Set the same directory as dataset['raw_data_parent_dir'] in the driver scripts
-3) Determine where the digital data output and images should go.
+2) Copy the MASTER files, and Set the data download directories and crontab
+   directories in the crontab/ directory.
+3) In the lpt/ directory, copy the MASTER files to local files. Then
+   set the same directory from (2) as dataset['raw_data_parent_dir'] in the driver scripts
+4) Determine where the digital data output and images should go.
    Set those as output['img_dir'] and output['data_dir'] in the driver scripts.
-4) (optional, but it helps to start with a 60+ day record for the LPTs tracking step)
-   To start with an up to date set of plots and digital data (back to January 2019), download the following image and data directories and untar them (tar -zxvf) on your system:
+5) (optional, but it helps to start with a 60+ day record for the LPTs tracking step)
+   To start with an up to date set of plots and digital data (back to January 2019), download the following image and data directories and untar them (`tar -zxvf FILE.tgz`) on your system:
      https://orca.atmos.washington.edu/~bkerns/realtime_mjo_tracking/lpt/data.tgz (128 MB)
      https://orca.atmos.washington.edu/~bkerns/realtime_mjo_tracking/lpt/images.tgz (699 MB).
-5) Recommend doing a manual test run of the data download and the LPT scripts.
-6) Turn on the crontab. Either add it to your current crontab, or set it as a new crontab
-    (crontab lpt.cron()
+6) Recommend doing a manual test run of the data download and the LPT scripts.
+7) Turn on the crontab. Either add it to your current crontab, or set it as a new crontab
+    (`crontab lpt.cron`).
 
 
 -------------------------------------------------------------------------------
