@@ -1,13 +1,15 @@
 # lpt-python
 Python version of LPT. Geared for real time use at NCEP.
 
-*This version DOES NOT yet include splitting up LPT system groups in to track branches.*
+*This version DOES NOT yet include splitting up LPT system groups in to track branches.*  
 *This version DOES NOT yet include MJO identification.*
+
 
 ## Python module dependencies (see below for full environment I used):
 - numpy
 - scipy.signal, scipy.ndimage
 - NetCDF4.Dataset
+
 
 ## Code organization:
 - Real time data download scripts, crontab setup, and log files are in crontab/.
@@ -21,6 +23,7 @@ Python version of LPT. Geared for real time use at NCEP.
     + lpt_real_time_driver_cmorph.py
     + lpt_real_time_driver.py  (The "master" real time driver function, called by the above two.)
 - Some test scripts are under tests/ directory. Mainly used for development purposes.
+
 
 ## Setting up LPT on a new system:
 1) Clone this repository to your system, or download the zip file format.
@@ -36,6 +39,7 @@ Python version of LPT. Geared for real time use at NCEP.
 6) Turn on the crontab. Either add it to your current crontab, or set it as a new crontab
     (crontab lpt.cron()
 
+
 -------------------------------------------------------------------------------
 ## In my implementation:
 - The repository is in /home/orca/bkerns/lib/lpt/lpt-python
@@ -43,16 +47,17 @@ Python version of LPT. Geared for real time use at NCEP.
 - CMORPH data are downloaded to /home/orca/data/satellite/cmorph
 - Digital data from LPT code is saved under
 
+
 I used Anaconda Python 3.6.2 with the following environment:
 
  $ conda list                                                                                                          [12:34:44]
-   packages in environment at /home/disk/atmos/bkerns/anaconda3/envs/meteo:
-backports                 1.0                      py36_1    conda-forge
-backports.functools_lru_cache 1.5                      py36_0    conda-forge
-basemap                   1.1.0                    py36_4    conda-forge
-basemap-data-hires        1.1.0                         0    conda-forge
-blas                      1.0                         mkl  
-ca-certificates           2018.1.18                     0    conda-forge
+   packages in environment at /home/disk/atmos/bkerns/anaconda3/envs/meteo:  
+backports                 1.0                      py36_1    conda-forge  
+backports.functools_lru_cache 1.5                      py36_0    conda-forge  
+basemap                   1.1.0                    py36_4    conda-forge  
+basemap-data-hires        1.1.0                         0    conda-forge  
+blas                      1.0                         mkl    
+ca-certificates           2018.1.18                     0    conda-forge  
 certifi                   2018.1.18                py36_0    conda-forge
 cmocean                   2.0                        py_0    conda-forge
 curl                      7.59.0                        0    conda-forge
