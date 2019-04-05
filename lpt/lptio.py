@@ -136,3 +136,73 @@ def lpt_system_tracks_output_ascii(fn, TIMECLUSTERS):
                                 , TIMECLUSTERS[ii]['nobj'][tt]))
 
     file.close()
+
+
+def lpt_system_tracks_output_netcdf(fn, TIMECLUSTERS):
+    """
+    This function outputs the "bulk" LPT system properties (centroid, date, area)
+    plus the LP Objects belonging to each "TIMECLUSTER" to an ascii file.
+    """
+    print('Writing LPT system track NetCDF output to: ' + fn)
+
+    os.makedirs(os.path.dirname(fn), exist_ok=True) # Make directory if needed.
+
+    DS = Dataset(fn, 'w', format='NETCDF4_CLASSIC', clobber=True)
+    DS.description = 'LPT Systems "timeclusters" NetCDF file.'
+
+    MISSING = np.nan
+    FILL_VALUE = -990.0
+    ##
+    ## Dimensions
+    ##
+    DS.createDimension('nlpt', len(TIMECLUSTERS))
+    max_points = 1
+    max_times = 1
+    timestamp_collect = np.array([MISSING])
+    centroid_lon_collect = np.array([MISSING])
+    max_lon_collect = np.array([MISSING])
+    centroid_lat_collect = np.array([MISSING])
+    area_collect = np.array([MISSING])
+    for ii in range(len(TIMECLUSTERS)):
+        max_points = max(max_points, len(TIMECLUSTERS[ii]['objid']))
+        max_times = max(max_times, len(TIMECLUSTERS[ii]['datetime']))
+        timestamp_collect = np.append(np.append(timestamp_collect, TIMECLUSTERS[ii]['timestamp']/3600.0),MISSING)
+        centroid_lon_collect = np.append(np.append(centroid_lon_collect, TIMECLUSTERS[ii]['centroid_lon']),MISSING)
+        max_lon_collect = np.append(np.append(max_lon_collect, TIMECLUSTERS[ii]['max_lon']),MISSING)
+        centroid_lat_collect = np.append(np.append(centroid_lat_collect, TIMECLUSTERS[ii]['centroid_lat']),MISSING)
+        area_collect = np.append(np.append(area_collect, TIMECLUSTERS[ii]['area']),MISSING)
+
+    DS.createDimension('nobj', max_points)
+    DS.createDimension('ntimes', max_times)
+    DS.createDimension('nall', len(timestamp_collect))
+
+    ##
+    ## Variables
+    ##
+
+    ## Stitchec "bulk" variables.
+    var_centroid_lon_all = DS.createVariable('centroid_lon_stitched','f4',('nall',))
+    #var_max_lon_all = DS.createVariable('max_lon_stitched','f4',('nall',))
+    var_centroid_lat_all = DS.createVariable('centroid_lat_stitched','f4',('nall',))
+    var_area_all = DS.createVariable('area_stitched','d',('nall',))
+    var_timestamp_all = DS.createVariable('timestamp_stitched','d',('nall',))
+
+    ##
+    ## Values
+    ##
+    var_centroid_lon_all[:] = centroid_lon_collect
+    #var_max_lon_all[:] = max_lon_collect
+    var_centroid_lat_all[:] = centroid_lat_collect
+    var_area_all[:] = area_collect
+    var_timestamp_all[:] = timestamp_collect
+
+    ##
+    ## Attributes/Metadata
+    ##
+    var_centroid_lon_all.setncatts({'units':'degrees_east','long_name':'centroid longitude (0-360) -- stitched','standard_name':'longitude'})
+    #var_max_lon_all.setncatts({'units':'degrees_east','long_name':'eastmost longitude (0-360) -- stitched','standard_name':'longitude'})
+    var_centroid_lat_all.setncatts({'units':'degrees_north','long_name':'centroid latitude (-90-90) -- stitched','standard_name':'latitude'})
+    var_area_all.setncatts({'units':'km2','long_name':'LPT System enclosed area -- stitched'})
+    var_timestamp_all.setncatts({'units':'hours since 1970-1-1 0:0','long_name':'LPT System time stamp -- stitched'})
+
+    DS.close()

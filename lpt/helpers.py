@@ -418,12 +418,100 @@ def overlap_forward_backward(LPT1, LPT2, options, verbose=True):
     return reorder_LPT_group_id(LPT3)
 
 
-def lpt_group_array_allow_center_jumps(LPT, center_jump_max_hour):
+def lpt_group_array_allow_center_jumps(LPT, options):
     """
-    Check duration of "end" to "start" points, and connect if less than
-    center_jump_max_hour.
+    Check duration of "end" (e.g., "this") to "start" points (e.g., "other"), and connect if less than
+    center_jump_max_hours.
     """
-    pass
+    LPT2 = LPT.copy() # Make a copy so I don't inadvertantly over-write the input LPT!
+
+    more_to_do = True
+    while more_to_do:
+        more_to_do = False
+
+        unique_lpt_groups = np.unique(LPT2[:,2])
+        lpt_indices_to_keep = np.array([])
+
+        for this_lpt_group in range(len(unique_lpt_groups)):                # 1
+            this_group_all_idx = np.where(LPT2[:,2] == this_lpt_group)[0]
+            this_group_end_idx = np.where(np.logical_and(LPT2[:,2] == this_lpt_group, LPT2[:,4] > 0.5))[0]
+
+            other_lpt_group_list = unique_lpt_groups[np.logical_not(unique_lpt_groups == this_lpt_group)]
+
+            for other_lpt_group in other_lpt_group_list:                    # 2
+                other_group_all_idx = np.where(LPT2[:,2] == other_lpt_group)[0]
+                other_group_begin_idx = np.where(np.logical_and(LPT2[:,2] == other_lpt_group, LPT2[:,3] > 0.5))[0]
+
+                for other_idx in other_group_begin_idx:                     # 3
+                    other_objid = LPT2[other_idx,1]
+                    other_begin_timestamp = LPT2[other_idx, 0]
+
+                    for this_idx in this_group_end_idx:                     # 4
+                        this_objid = LPT2[this_idx,1]
+                        this_end_timestamp = LPT2[this_idx, 0]
+
+                        tsdiff = (other_begin_timestamp - this_end_timestamp)
+
+                        if (tsdiff > 1.0 and tsdiff <  options['center_jump_max_hours'] * 3600.0 + 1.0):
+
+                            ## If I got here, the timing is OK for a center jump.
+                            ## Now, check the overlapping criteria.
+                            n_this, n_prev, n_overlap = calc_overlapping_points(this_objid,other_objid,options['objdir'])
+                            match = False
+                            if n_overlap >= options['min_overlap_points']:
+                                match=True
+                            if 1.0*n_overlap/n_this > options['min_overlap_frac']:
+                                match=True
+                            if 1.0*n_overlap/n_prev > options['min_overlap_frac']:
+                                match=True
+
+                            if match:
+                                ## I found a center jump! Add it to "this group"
+                                LPT2[other_group_all_idx, 2] = this_lpt_group
+                                more_to_do = True
+                                break                                       # 4
+
+                    if more_to_do:
+                        break                                               # 3
+
+                if more_to_do:
+                    break                                                   # 2
+
+            if more_to_do:
+                break                                                       # 1
+
+    return reorder_LPT_group_id(LPT2)
+
+
+def remove_short_lived_systems(LPT, minimum_duration_hours, latest_datetime = dt.datetime(2063,4,5,0,0,0)):
+
+    """
+    Remove short duration LPT groups.
+    But only up to the latest_datetime.
+    """
+
+    latest_timestamp = latest_datetime.timestamp()
+    unique_lpt_groups = np.unique(LPT[:,2])
+    lpt_indices_to_keep = np.array([])
+
+    for this_lpt_group in range(len(unique_lpt_groups)):
+        this_lpt_group_idx = np.where(LPT[:,2] == this_lpt_group)[0]
+
+        timestamp_this_group = LPT[this_lpt_group_idx,0]
+        min_timestamp_this_group = np.min(timestamp_this_group)
+        max_timestamp_this_group = np.max(timestamp_this_group)
+
+        if max_timestamp_this_group > latest_timestamp:
+            lpt_indices_to_keep = np.append(lpt_indices_to_keep, this_lpt_group_idx)
+        else:
+            duration_this_group_hours = (max_timestamp_this_group - min_timestamp_this_group) / 3600.0
+            if duration_this_group_hours > (minimum_duration_hours - 0.01):
+                lpt_indices_to_keep = np.append(lpt_indices_to_keep, this_lpt_group_idx)
+
+    LPT2 = LPT[lpt_indices_to_keep.astype('int').tolist(),:]
+
+    return reorder_LPT_group_id(LPT2)
+
 
 
 def reorder_LPT_group_id(LPT):
@@ -498,11 +586,17 @@ def calc_lpt_system_group_properties(LPT, options):
 
 
 def separate_lpt_system_branches(LPTfb, LPTf, LPTb, options):
+    """
+    TODO: NOT YET IMPLEMENTED.
+    """
     LPT_with_branches = LPTfb.copy() # Start with forward/backwards merged system.
 
 
 def calc_lpt_system_group_properties_with_branches(LPT_with_branches, options):
     pass
+    """
+    TODO: NOT YET IMPLEMENTED.
+    """
 
 
 

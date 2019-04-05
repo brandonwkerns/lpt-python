@@ -93,7 +93,7 @@ def plot_rain_map_with_filtered_contour(ax, DATA_ACCUM, OBJ, plot_area=[50, 200,
     return (map1, H1, Hobj, CB)
 
 
-def plot_timelon_with_lpt(ax2, dt_list, lon, timelon_rain, TIMECLUSTERS, lon_range):
+def plot_timelon_with_lpt(ax2, dt_list, lon, timelon_rain, TIMECLUSTERS, lon_range, accum_time_hours = 0):
 
     cmap = cmap_map(lambda x: x/2 + 0.5, plt.cm.jet)
     cmap.set_under(color='white')
@@ -104,11 +104,13 @@ def plot_timelon_with_lpt(ax2, dt_list, lon, timelon_rain, TIMECLUSTERS, lon_ran
 
     for ii in range(len(TIMECLUSTERS)):
         x = TIMECLUSTERS[ii]['centroid_lon']
-        y = TIMECLUSTERS[ii]['datetime']
+        ## TIMECLUSTERS[ii]['datetime'] is END of accumulation time.
+        ## For plotting, use CENTER of accumulation time, if specified (accum_time_hours).
+        y = [yy - dt.timedelta(hours=0.5*accum_time_hours) for yy in TIMECLUSTERS[ii]['datetime']]
         ax2.plot(x, y, 'k', linewidth=1.5)
 
-        ax2.text(x[0], y[0], str(int(ii)), fontweight='bold', color='red',clip_on=True)
-        ax2.text(x[-1], y[-1], str(int(ii)), fontweight='bold', color='red',clip_on=True)
+        ax2.text(x[0], y[0], str(int(ii)), fontweight='bold', color='k',clip_on=True, fontsize=14, ha='center', va='top')
+        ax2.text(x[-1], y[-1], str(int(ii)), fontweight='bold', color='k',clip_on=True, fontsize=14, ha='center', va='bottom')
 
     ax2.set_xlim(lon_range)
     ax2.set_ylim([dt_list[0], dt_list[-1]])

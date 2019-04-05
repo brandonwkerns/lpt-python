@@ -153,16 +153,22 @@ def lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,argv):
         LPTfb = lpt.helpers.overlap_forward_backward(LPTf.copy(), LPTb.copy(), options, verbose=True)
 
         ## Allow center jumps.
+        print(('Allow center jumps up to ' + str(options['center_jump_max_hours']) + ' hours.'))
+        LPT_center_jumps = lpt.helpers.lpt_group_array_allow_center_jumps(LPTfb, options)
 
         ## Eliminate short duration systems.
+        print(('Remove LPT shorter than ' + str(options['min_lpt_duration_hours']) + ' hours.'))
+        LPT_remove_short = lpt.helpers.remove_short_lived_systems(LPT_center_jumps, options['min_lpt_duration_hours']
+                                , latest_datetime = latest_lp_object_time - dt.timedelta(hours=options['min_lpt_duration_hours']))
 
         ## Get "timeclusters" tracks.
         print('Calculating LPT properties.')
-        TIMECLUSTERS = lpt.helpers.calc_lpt_system_group_properties(LPTfb, options)
+        TIMECLUSTERS = lpt.helpers.calc_lpt_system_group_properties(LPT_remove_short, options)
 
         fn_tc_base = (options['outdir'] + '/' + end_of_accumulation_time.strftime(output['sub_directory_format'])
                          + '/lpt_systems_tmpa_rt_' + YMDH + '__' + str(options['lpt_history_days']) + 'days')
         lpt.lptio.lpt_system_tracks_output_ascii(fn_tc_base + '.txt', TIMECLUSTERS)
+        lpt.lptio.lpt_system_tracks_output_netcdf(fn_tc_base + '.nc', TIMECLUSTERS)
 
 
     """
@@ -186,7 +192,8 @@ def lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,argv):
 
 
         lpt.plotting.plot_timelon_with_lpt(ax2, dt_list, DATA_RAW['lon']
-                , timelon_rain, TIMECLUSTERS, plotting['time_lon_range'])
+                , timelon_rain, TIMECLUSTERS, plotting['time_lon_range']
+                , accum_time_hours = lpo_options['accumulation_hours'])
 
         ax2.set_title((dataset['label'].upper() + ' RT '
                         + '15S-15N Rain Rate and LPTs\n' + YMDH_fancy))
