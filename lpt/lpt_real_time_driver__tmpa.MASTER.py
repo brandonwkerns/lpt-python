@@ -72,9 +72,16 @@ lpt_options['min_lp_objects_points'] = 100    # Disregard LP objects smaller tha
 lpt_options['min_lpt_duration_hours'] = 7*24  # Minumum duration to keep it as an LPT
 lpt_options['center_jump_max_hours'] = 3*24   # How long to allow center jumps
 
+## Merging/Splitting settings
+merge_split_options={}
+merge_split_options{'allow_merge_split'} = True
+merge_split_options{'split_then_recombine_max_hours'} = 99999  # Max duration of a split and recombine event.
+merge_split_options{'split_merger_min_hours'} = 72     # Min duration of a split/merging track to separate it.
+
+
 
 """
 Call the real time driver function.
 """
 
-lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,sys.argv)
+lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,merge_split_options,sys.argv)
