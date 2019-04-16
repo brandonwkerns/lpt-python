@@ -226,14 +226,18 @@ def calc_overlapping_points(objid1, objid2, objdir):
 
 def init_lpt_group_array(dt_list, objdir):
     """
-    "LPT" is a 2-D array with columns: [timestamp, objid, lpt_group_id, begin_point, end_point, split_point]
+    "LPT" is a 2-D array with columns: [timestamp, objid, lpt_group_id, begin_point, end_point, split_point, branches]
     -- timestamp = Linux time stamp (e.g., seconds since 00 UTC 1970-1-1)
     -- objid = LP object id (YYYYMMDDHHnnnn)
     -- lpt_group_id = LPT group id, connected LP objects have a common LPT group id.
     -- begin point = 1 if it is the beginning of a track. 0 otherwise.
     -- end point = 1 if no tracks were connected to it, 0 otherwise.
     -- split point = 1 if split detected, 0 otherwise.
+    -- branches = bitwise binary starts from 1 at each branch. Mergers will have separate branch numbers.
     """
+
+    max_branches = 32
+    binary_fmt = '0' + str(max_branches) + 'b'
 
     fmt = ("/%Y/%m/%Y%m%d/objects_%Y%m%d%H.nc")
 
@@ -247,7 +251,7 @@ def init_lpt_group_array(dt_list, objdir):
         DS.close()
 
         for ii in range(len(id_list)):
-            LPT.append([this_dt.timestamp(), id_list[ii], -1, 0, 1, 0])
+            LPT.append([this_dt.timestamp(), id_list[ii], -1, 0, 1, 0, int(0)])
 
     return np.array(LPT)
 
@@ -294,13 +298,15 @@ def calc_lpt_group_array(LPT, options, verbose=False, reversed=False):
     options['min_overlap_points']
     options['min_overlap_frac']
 
-    "LPT" is a 2-D array with columns: [timestamp, objid, lpt_group_id, begin_point, end_point, split_point]
+    "LPT" is a 2-D array with columns: [timestamp, objid, lpt_group_id, begin_point, end_point, split_point, branches]
     -- timestamp = Linux time stamp (e.g., seconds since 00 UTC 1970-1-1)
     -- objid = LP object id (YYYYMMDDHHnnnn)
     -- lpt_group_id = LPT group id, connected LP objects have a common LPT group id.
     -- begin point = 1 if it is the beginning of a track. 0 otherwise.
     -- end point = 1 if no tracks were connected to it, 0 otherwise.
     -- split point = 1 if split detected, 0 otherwise.
+    -- branches = bitwise binary starts from 1 at each branch. Mergers will have separate branch numbers.
+                   overlapping portions will have multiple branch numbers associated with them.
     """
 
     objdir = options['objdir']
@@ -317,6 +323,7 @@ def calc_lpt_group_array(LPT, options, verbose=False, reversed=False):
     for ii in range(len(first_time_idx)):
         LPT[first_time_idx[ii],2] = next_lpt_group_id
         LPT[first_time_idx[ii],3] = 1
+        LPT[first_time_idx[ii],6] = int(1) # This is the first branch of the LPT. (e.g., 2**0)
         next_lpt_group_id += 1
 
 
@@ -333,6 +340,9 @@ def calc_lpt_group_array(LPT, options, verbose=False, reversed=False):
 
         already_connected_objid_list = [] # Keep track of previously connected objids, for split detection.
 
+
+        append_branch_list = [] # For splits, I will have to add branches to previous points.
+                                # This will be a list of tuples, each like (jj, branch_to_append).
         for ii in this_time_idx:
             this_objid = LPT[ii,1]
             match = -1
@@ -348,22 +358,99 @@ def calc_lpt_group_array(LPT, options, verbose=False, reversed=False):
                 if 1.0*n_overlap/n_prev > options['min_overlap_frac']:
                     match=jj
 
-            if match>-1:
+            if match > -1:  # I found a match! Note: for merging cases,
+                            # this will use the *last* one to match.
+
                 LPT[ii,2] = LPT[match,2] # assign the same group.
                 LPT[match,4] = 0 # this one got matched, so not a track end point.
+
                 if LPT[match,1] in already_connected_objid_list:
-                    LPT[match,5] = 1
+
+                    ## OK, This is a split situation!
+
+                    LPT[match,5] = 1 # Identify the split point
+                    new_branch = get_group_max_branch(LPT, LPT[match,2]) + 1
+                    LPT[ii,6] = append_branch(LPT[ii,6], new_branch)  # Start with a fresh, new branch.
+                                                                      # Note: I start with branches = 0 here.
+                                                                      # LPT[ii,6] should be 0 before appending.
+
+                    append_branch_list.append((match,new_branch)) # Append new branch to splitting point.
+                    ##############################################################
+                    ## Now I need to append the branch to the previous section of track.
+                    ## Basically, everything that is:
+                    ##  1) In the same group.
+                    ##  2) Has a time stamp prior to prev_time
+                    ##  3) Has overlapping branches with the splitting point.
+                    ##############################################################
+                    for dddd in np.where(LPT[:,2] == LPT[ii,2])[0]:
+                        if LPT[dddd,0] < LPT[match,0] - 0.001:
+                            if int(LPT[dddd,6]) & int(LPT[match,6]): # & with int is *bitwise and*.
+                                append_branch_list.append((dddd,new_branch)) # Append new branch.
+
                 else:
+
+                    ## Split situation not detected. Continue the previous track.
+                    ## (Subsequent passes through the loop may reveal splits)
+
                     already_connected_objid_list.append(LPT[match,1])
-            else:
+                    LPT[ii,6] = LPT[match,6] # Inherit all branches from the previous one.
+
+            else:   # No overlaps with prior tracks. Therefore, this begins a new group.
                 LPT[ii,2] = next_lpt_group_id
                 LPT[ii,3] = 1 # This is the beginning of a track.
+                LPT[ii,6] = int(1) # This is the first branch of the LPT. (e.g., 2**0)
                 next_lpt_group_id += 1
+
+        for this_append_tuple in append_branch_list:
+            jj = this_append_tuple[0]
+            this_branch_to_append = this_append_tuple[1]
+            LPT[jj,6] = append_branch(LPT[jj,6], this_branch_to_append) #split point inherits matches.
 
     if reversed:
         LPT = LPT[::-1,:]
 
     return LPT
+
+def append_branch(branches_binary_int, new_branch_to_append):
+    """
+    Append branch number IF is it not already there.
+    Note: Python 3 or operator in integers is a binary or.
+    """
+    return int(branches_binary_int) | int(2**(new_branch_to_append-1))
+
+
+def max_branch(branches_binary_int):
+    return len(bin(int(branches_binary_int))) - 2 # Subtract out the initial "0b" header.
+
+
+def has_branch(branches_binary_int, branch_num):
+    """
+    Return true if the branch_num is a part of the branches_binary_int
+    e.g., has_branch(3,2) is True. has_branch(3,3) is False (2**2 = 4 is not included)
+    NOTE: branch numbers are ONE based.
+    """
+    branches_binary_str = str(bin(int(branches_binary_int)))
+    if (branches_binary_str[-1*int(branch_num)] == '1'):
+        return True
+    else:
+        return False
+
+
+
+def get_group_max_branch(LPT, lpt_group_id):
+    """
+    branches is of form "0000 ... 001111"
+    What I want is the position of the highest "1"
+    in the group.
+    """
+    current_max_branch = 0;
+
+    idx_this_lpt_group = np.where(LPT[:,2] == lpt_group_id)[0]
+    for this_idx in idx_this_lpt_group:
+        current_max_branch = max(current_max_branch, max_branch(LPT[this_idx, 6]))
+
+    return int(current_max_branch)
+
 
 def overlap_forward_backward(LPT1, LPT2, options, verbose=True):
     """
@@ -481,6 +568,14 @@ def lpt_group_array_allow_center_jumps(LPT, options):
                 break                                                       # 1
 
     return reorder_LPT_group_id(LPT2)
+
+
+
+
+def lpt_split_and_merge(LPT, merge_split_options):
+    ## TODO: Add code for splits and mergers here.
+    return LPT
+
 
 
 def remove_short_lived_systems(LPT, minimum_duration_hours, latest_datetime = dt.datetime(2063,4,5,0,0,0)):
@@ -658,10 +753,29 @@ def plot_lpt_groups_time_lon_text(ax, LPT, options, text_color='k'):
             this_text_color = 'g'
             this_zorder = 20
 
-        plt.text(lon, dt1, str(int(LPT[ii,2])), color=this_text_color, zorder=this_zorder)
+        #plt.text(lon, dt1, str(int(LPT[ii,2])), color=this_text_color, zorder=this_zorder)
+        #plt.text(lon, dt1, str(float_lpt_id(LPT[ii,2], max_branch(LPT[ii,6]))), color=this_text_color, zorder=this_zorder)
+        plt.text(lon, dt1, str(float_lpt_id(LPT[ii,2], LPT[ii,6])), color=this_text_color, zorder=this_zorder)
 
     ax.set_xlim([0.0, 360.0])
     ax.set_ylim([dt_min, dt_max])
+
+
+
+def float_lpt_id(group, branch):
+    """
+    Branch is a decimal tacked on to the group ID.
+    group 7, branch #1 is 7.01
+    group 20, branch 10 is 20.10
+    Branch > 100 will give an error message and return np.nan.
+    """
+    if branch > 99:
+        print('ERROR! Branch number > 99.')
+        float_id = np.nan
+    else:
+        float_id = group + branch / 100.0
+
+    return float_id
 
 
 def plot_timeclusters_time_lon(ax, TIMECLUSTERS, linewidth=2.0):
