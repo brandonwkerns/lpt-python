@@ -1,6 +1,7 @@
 import numpy as np
 from context import lpt
 import matplotlib.pylab as plt
+from matplotlib import dates
 import datetime as dt
 
 plt.close('all')
@@ -38,12 +39,12 @@ print(dt.datetime.now(), flush=True)
 LPTf = lpt.helpers.calc_lpt_group_array(LPT0.copy(), options, verbose=True)
 print(dt.datetime.now(), flush=True)
 
-fig0 = plt.figure(figsize=(11.0,8.5))
+fig0 = plt.figure(figsize=(50.0,30))
 ax0 = fig0.add_subplot(131)
 lpt.helpers.plot_lpt_groups_time_lon_text(ax0, LPTf, options)
 ax0.set_title('Forward')
 
-"""
+
 print('Looping backwards')
 print(dt.datetime.now(), flush=True)
 LPTb = lpt.helpers.calc_lpt_group_array(LPT0.copy(), options, verbose=True, reversed=True)
@@ -70,12 +71,15 @@ print(dt.datetime.now(), flush=True)
 #fig = plt.figure(figsize=(8.5,11))
 ax = fig0.add_subplot(133)
 lpt.helpers.plot_timeclusters_time_lon(ax, TIMECLUSTERS0)
-lpt.helpers.plot_lpt_groups_time_lon_text(ax, LPTfb, options, text_color='darkgrey')
+lpt.helpers.plot_lpt_groups_time_lon_text(ax, LPTfb, options, text_color='k')
 ax.set_title('Forward and Backwards, No Branches')
+ax.set_yticks(dt_list[::8])
+ax.grid()
+ax.yaxis.set_major_formatter(dates.DateFormatter("%m/%d"))
 
 plt.savefig('test_tracking.png')
 
-fn_tc = 'TEST.txt'
+fn_tc = './TEST.txt'
 lpt.lptio.lpt_system_tracks_output_ascii(fn_tc, TIMECLUSTERS0)
-"""
-plt.show()
+
+#plt.show()

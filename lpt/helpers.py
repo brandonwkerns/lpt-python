@@ -234,10 +234,11 @@ def init_lpt_group_array(dt_list, objdir):
     -- end point = 1 if no tracks were connected to it, 0 otherwise.
     -- split point = 1 if split detected, 0 otherwise.
     -- branches = bitwise binary starts from 1 at each branch. Mergers will have separate branch numbers.
+                   overlapping portions will have multiple branch numbers associated with them.
     """
 
-    max_branches = 32
-    binary_fmt = '0' + str(max_branches) + 'b'
+    #max_branches = 32
+    #binary_fmt = '0' + str(max_branches) + 'b'
 
     fmt = ("/%Y/%m/%Y%m%d/objects_%Y%m%d%H.nc")
 
@@ -379,13 +380,19 @@ def calc_lpt_group_array(LPT, options, verbose=False, reversed=False):
                     ## Now I need to append the branch to the previous section of track.
                     ## Basically, everything that is:
                     ##  1) In the same group.
-                    ##  2) Has a time stamp prior to prev_time
+                    ##  2) Has a time stamp prior to prev_time (after for reversed tracking case)
                     ##  3) Has overlapping branches with the splitting point.
                     ##############################################################
                     for dddd in np.where(LPT[:,2] == LPT[ii,2])[0]:
-                        if LPT[dddd,0] < LPT[match,0] - 0.001:
-                            if int(LPT[dddd,6]) & int(LPT[match,6]): # & with int is *bitwise and*.
-                                append_branch_list.append((dddd,new_branch)) # Append new branch.
+                        if reversed:
+                            if LPT[dddd,0] > LPT[match,0] + 0.001:
+                                if int(LPT[dddd,6]) & int(LPT[match,6]): # & with int is *bitwise and*.
+                                    append_branch_list.append((dddd,new_branch)) # Append new branch.
+
+                        else:
+                            if LPT[dddd,0] < LPT[match,0] - 0.001:
+                                if int(LPT[dddd,6]) & int(LPT[match,6]): # & with int is *bitwise and*.
+                                    append_branch_list.append((dddd,new_branch)) # Append new branch.
 
                 else:
 
@@ -452,6 +459,32 @@ def get_group_max_branch(LPT, lpt_group_id):
     return int(current_max_branch)
 
 
+def get_group_branches_as_list(branches_binary_int):
+
+    branches_binary_str = str(bin(int(branches_binary_int)))[2:]
+    branches_binary_str_r = branches_binary_str[::-1]
+    return [x + 1 for x in range(len(branches_binary_str_r)) if branches_binary_str_r[x] == '1']
+
+
+def get_group_branches_as_int_list(branches_binary_int):
+
+    branches_binary_str = str(bin(int(branches_binary_int)))[2:]
+    branches_binary_str_r = branches_binary_str[::-1]
+    return [2**x for x in range(len(branches_binary_str_r)) if branches_binary_str_r[x] == '1']
+
+
+def branches_binary_str4(branches_binary_int):
+    """
+    String of binary 0 and 1s with break points every 4 digits.
+    """
+    str0 = str(bin(int(branches_binary_int)))[2:]
+    str_length0 = len(str0)
+    str_length1 = int(4 * np.ceil(str_length0/4)) # Get new length -- a multiple of 4.
+    str1 = str0.zfill(str_length1) # Append zeros to the left if needed.
+    str_pieces = [str1[x:x+4] for x in range(0,len(str1),4)]
+    return " ".join(str_pieces)
+
+
 def overlap_forward_backward(LPT1, LPT2, options, verbose=True):
     """
     LPT1 is meant to be forward.
@@ -499,9 +532,116 @@ def overlap_forward_backward(LPT1, LPT2, options, verbose=True):
             if more_to_do:
                 break
 
-    LPT3[:,3] = LPT1[:,3] * LPT2[:,4]
-    LPT3[:,4] = LPT1[:,4] * LPT2[:,3]
-    LPT3[:,5] = LPT1[:,5] + LPT2[:,5]
+    LPT3[:,3] = LPT1[:,3] * LPT2[:,4]  ## Begin - begin (end) points in forward (backwards)
+    LPT3[:,4] = LPT1[:,4] * LPT2[:,3]  ## End - end (begin) poings in forward (backwards)
+    LPT3[:,5] = LPT1[:,5] + LPT2[:,5]  ## Split -- pick up splits identified by forward AND backwards.
+
+
+    ##########################################################
+    ## Overlapping branches stuff.
+    ## Using the "brute force" method of going through time stamp by time stamp.
+    ##########################################################
+
+
+    print('Managing overlapping branches.')
+
+    for this_lpt_group in np.unique(LPT3[:,2]):
+
+        print('Group: ', str(this_lpt_group))
+        this_lpt_group_idx_all = np.where(LPT3[:,2] == this_lpt_group)[0]
+        this_lpt_time_stamps_all = np.sort(np.unique(LPT3[this_lpt_group_idx_all,0]))
+
+        ## Skip this group if it only has one branch.
+        if len(np.unique(LPT3[this_lpt_group_idx_all,6])) < 2:
+            continue
+
+        ## OK, more than two branches. Reset all branches and start from scratch:(
+        LPT3[this_lpt_group_idx_all,6] = 0
+        next_new_branch = 0
+
+        this_lpt_group_idx_begin_points = np.where(np.logical_and(LPT3[:,2] == this_lpt_group, LPT3[:,3] == 1))[0]
+
+        nn = 0
+        for begin_idx in this_lpt_group_idx_begin_points:
+            nn += 1
+            print(("- Begin node #" + str(nn) + " of "
+                    + str(len(this_lpt_group_idx_begin_points))))
+
+            ## Iterate until I have connected this initial node point
+            ##   with each of the ending node points.
+            more_to_do = True # If I find a split, then there is more to do for this starting node.
+                              # (mergers are handled as separate starting nodes.)
+            already_matched_indices = [] # Keep track of which indices have already been assigned a branch.
+            niter = 0
+            while more_to_do:
+                more_to_do = False
+                niter += 1
+
+
+                ## Seed a new branch.
+                LPT3[begin_idx,6] = int(LPT3[begin_idx,6]) | int(2**next_new_branch) # Bitwise or
+                current_branch = 1 * next_new_branch # Make sure assignment is by value.
+                next_new_branch += 1
+                print("-- Branch #" + str(next_new_branch))
+
+                prev_objid = LPT3[begin_idx,1]
+
+                for this_time_stamp in this_lpt_time_stamps_all:
+                    if this_time_stamp > LPT3[begin_idx,0] + 0.01:
+
+                        ## Looping forward in time. search for matches with previous branches.
+                        lpt_indices_at_this_time = np.where(np.logical_and(LPT3[:,2] == this_lpt_group, LPT3[:,0] == this_time_stamp))[0]
+                        matches_this_branch = 0 * lpt_indices_at_this_time
+
+
+                        lpt_indices_at_this_time_matches = []
+
+
+                        for ii in range(len(lpt_indices_at_this_time)):
+                            this_objid = LPT3[lpt_indices_at_this_time[ii],1]
+                            #print(str(int(this_objid)))
+                            n_this, n_prev, n_overlap = calc_overlapping_points(this_objid,prev_objid,options['objdir'])
+                            match = False
+                            if n_overlap >= options['min_overlap_points']:
+                                match = True
+                            if 1.0*n_overlap/n_this > options['min_overlap_frac']:
+                                match = True
+                            if 1.0*n_overlap/n_prev > options['min_overlap_frac']:
+                                match = True
+
+                            if match:
+                                matches_this_branch[ii] = 1 # I should always find at least 1 match here.
+                                if not lpt_indices_at_this_time[ii] in already_matched_indices:
+                                    lpt_indices_at_this_time_matches.append(lpt_indices_at_this_time[ii])
+                        #print(lpt_indices_at_this_time_matches)
+
+                        if len(lpt_indices_at_this_time_matches) > 1:
+
+                            move_forward_idx = lpt_indices_at_this_time_matches[0]
+                        else:
+                            move_forward_idx = lpt_indices_at_this_time_matches[0]
+
+                        LPT3[move_forward_idx,6] = int(LPT3[move_forward_idx,6]) | int(2**current_branch) # Bitwise or
+
+                        ## If I hit splitting node, take this branch out of "already matched indices".
+                        if len(lpt_indices_at_this_time_matches) > 1 and LPT3[prev_idx,5] == 1:
+                            idx_with_this_branch = [ x for x in this_lpt_group_idx_all if int(LPT3[x,6]) & int(2**current_branch) ]
+                            for kk in idx_with_this_branch:
+                                if kk in already_matched_indices:
+                                    already_matched_indices.remove(kk)
+                                    more_to_do = True
+
+                        already_matched_indices.append(move_forward_idx)
+                        prev_objid = 1 * LPT3[move_forward_idx,1]
+                        prev_idx = 1 * move_forward_idx
+
+                        ## Break out of TIME loop if I have found an end node point.
+                        if LPT3[move_forward_idx,4] == 1:
+                            break
+
+                #print(more_to_do)
+
+
     return reorder_LPT_group_id(LPT3)
 
 
@@ -753,12 +893,11 @@ def plot_lpt_groups_time_lon_text(ax, LPT, options, text_color='k'):
             this_text_color = 'g'
             this_zorder = 20
 
-        #plt.text(lon, dt1, str(int(LPT[ii,2])), color=this_text_color, zorder=this_zorder)
-        #plt.text(lon, dt1, str(float_lpt_id(LPT[ii,2], max_branch(LPT[ii,6]))), color=this_text_color, zorder=this_zorder)
-        plt.text(lon, dt1, str(float_lpt_id(LPT[ii,2], LPT[ii,6])), color=this_text_color, zorder=this_zorder)
+        plt.text(lon, dt1, (str(LPT[ii,2]) + ": " + branches_binary_str4(LPT[ii,6]))
+                  , color=this_text_color, zorder=this_zorder, fontsize=6, clip_on=True)
 
     ax.set_xlim([0.0, 360.0])
-    ax.set_ylim([dt_min, dt_max])
+    ax.set_ylim([dt_min, dt_max + dt.timedelta(hours=3)])
 
 
 
@@ -785,5 +924,5 @@ def plot_timeclusters_time_lon(ax, TIMECLUSTERS, linewidth=2.0):
         y = TIMECLUSTERS[ii]['datetime']
         ax.plot(x, y, 'k', linewidth=linewidth)
 
-        plt.text(x[0], y[0], str(int(ii)), fontweight='bold', color='red')
-        plt.text(x[-1], y[-1], str(int(ii)), fontweight='bold', color='red')
+        plt.text(x[0], y[0], str(int(ii)), fontweight='bold', color='red', clip_on=True)
+        plt.text(x[-1], y[-1], str(int(ii)), fontweight='bold', color='red', clip_on=True)

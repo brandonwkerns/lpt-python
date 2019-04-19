@@ -9,7 +9,7 @@ import matplotlib.colors as colors
 import scipy.ndimage
 
 
-def lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,argv):
+def lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,merge_split_options,argv):
 
     ## Use current real time, or specified time from the command line args.
     if len(argv) < 2:
@@ -155,6 +155,10 @@ def lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,argv):
         ## Allow center jumps.
         print(('Allow center jumps up to ' + str(options['center_jump_max_hours']) + ' hours.'))
         LPT_center_jumps = lpt.helpers.lpt_group_array_allow_center_jumps(LPTfb, options)
+
+        if merge_split_options['allow_merge_split']:
+            print('Doing splits and mergers.')
+            LPT_center_jumps = lpt.helpers.lpt_split_and_merge(LPT_center_jumps.copy(), merge_split_options)
 
         ## Eliminate short duration systems.
         print(('Remove LPT shorter than ' + str(options['min_lpt_duration_hours']) + ' hours.'))
