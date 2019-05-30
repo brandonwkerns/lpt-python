@@ -73,10 +73,10 @@ def calc_grid_cell_area(lon, lat):
         dlon = 0.0*lon
         dlat = 0.0*lat
 
-        dlon[:,1:nx-1] = 0.5*(lon[:,1:nx-1] + lon[:,2:nx]) - 0.5*(lon[:,0:nx-2] + lon[:,1:nx-1])
+        dlon[:,1:nx-1] = abs(0.5*(lon[:,1:nx-1] + lon[:,2:nx]) - 0.5*(lon[:,0:nx-2] + lon[:,1:nx-1]))
         dlon[:,0] = dlon[:,1]
         dlon[:,nx-1] = dlon[:,nx-2]
-        dlat[1:ny-1,:] = 0.5*(lat[1:ny-1,:] + lat[2:ny,:]) - 0.5*(lat[0:ny-2,:] + lat[1:ny-1,:])
+        dlat[1:ny-1,:] = abs(0.5*(lat[1:ny-1,:] + lat[2:ny,:]) - 0.5*(lat[0:ny-2,:] + lat[1:ny-1,:]))
         dlat[0,:] = dlat[1,:]
         dlat[ny-1,:] = dlat[ny-2,:]
 
@@ -155,10 +155,9 @@ def get_objid_datetime(objid):
     return dt.datetime.strptime(ymdh_str, "%Y%m%d%H")
 
 
-def read_lp_object_properties(objid, objdir, property_list, verbose=False):
+def read_lp_object_properties(objid, objdir, property_list, verbose=False, fmt="/%Y/%m/%Y%m%d/objects_%Y%m%d%H.nc"):
 
     dt1 = get_objid_datetime(objid)
-    fmt = ("/%Y/%m/%Y%m%d/objects_%Y%m%d%H.nc")
     fn1 = (objdir + dt1.strftime(fmt))
 
     if verbose:
@@ -176,8 +175,10 @@ def read_lp_object_properties(objid, objdir, property_list, verbose=False):
     return out_dict
 
 
-def get_latest_lp_object_time(objdir):
-    obj_file_list = sorted(glob.glob((objdir + "/????/??/????????/*.nc")))
+def get_latest_lp_object_time(objdir, level=3):
+    #obj_file_list = sorted(glob.glob((objdir + "/????/??/????????/*.nc")))
+    obj_file_list = sorted(glob.glob((objdir + "/*"*level + "/*.nc")))
+
     last_obj_file = obj_file_list[-1]
     return dt.datetime.strptime(last_obj_file[-13:-3], "%Y%m%d%H")
 
@@ -194,12 +195,11 @@ def to1d(ndarray_or_ma):
     return fout
 
 
-def calc_overlapping_points(objid1, objid2, objdir):
+def calc_overlapping_points(objid1, objid2, objdir, fmt="/%Y/%m/%Y%m%d/objects_%Y%m%d%H.nc"):
 
     dt1 = get_objid_datetime(objid1)
     dt2 = get_objid_datetime(objid2)
 
-    fmt = ("/%Y/%m/%Y%m%d/objects_%Y%m%d%H.nc")
     fn1 = (objdir + dt1.strftime(fmt))
     fn2 = (objdir + dt2.strftime(fmt))
 
@@ -224,7 +224,7 @@ def calc_overlapping_points(objid1, objid2, objdir):
     return (len(x1), len(x2), np.sum(overlap))
 
 
-def init_lpt_group_array(dt_list, objdir):
+def init_lpt_group_array(dt_list, objdir, fmt = "/%Y/%m/%Y%m%d/objects_%Y%m%d%H.nc"):
     """
     "LPT" is a 2-D array with columns: [timestamp, objid, lpt_group_id, begin_point, end_point, split_point, branches]
     -- timestamp = Linux time stamp (e.g., seconds since 00 UTC 1970-1-1)
@@ -240,14 +240,16 @@ def init_lpt_group_array(dt_list, objdir):
     #max_branches = 32
     #binary_fmt = '0' + str(max_branches) + 'b'
 
-    fmt = ("/%Y/%m/%Y%m%d/objects_%Y%m%d%H.nc")
 
     LPT = []
 
     for this_dt in dt_list:
 
+        print(this_dt)
         fn = (objdir + this_dt.strftime(fmt))
+        print(fn)
         DS = Dataset(fn)
+        print(DS)
         id_list = DS['objid'][:]
         DS.close()
 
@@ -257,7 +259,7 @@ def init_lpt_group_array(dt_list, objdir):
     return np.array(LPT)
 
 
-def lpt_group_array_remove_small_objects(LPT, options, verbose=False):
+def lpt_group_array_remove_small_objects(LPT, options, verbose=False, fmt="/%Y/%m/%Y%m%d/objects_%Y%m%d%H.nc"):
     """
     LPT comes from the init_lpt_group_array function
     options needs:
@@ -270,7 +272,6 @@ def lpt_group_array_remove_small_objects(LPT, options, verbose=False):
         this_objid = LPT[ii,1]
 
         dt1 = get_objid_datetime(this_objid)
-        fmt = ("/%Y/%m/%Y%m%d/objects_%Y%m%d%H.nc")
         fn1 = (objdir + dt1.strftime(fmt))
 
         if verbose:
@@ -288,7 +289,7 @@ def lpt_group_array_remove_small_objects(LPT, options, verbose=False):
     return LPT[keep_list,:]
 
 
-def calc_lpt_group_array(LPT, options, verbose=False, reversed=False):
+def calc_lpt_group_array(LPT, options, verbose=False, reversed=False, fmt="/%Y/%m/%Y%m%d/objects_%Y%m%d%H.nc"):
 
     """
     usage: LPT = calc_lpt_group_array(LPT, objdir, options)
@@ -350,7 +351,7 @@ def calc_lpt_group_array(LPT, options, verbose=False, reversed=False):
             for jj in prev_time_idx:
                 prev_objid = LPT[jj,1]
 
-                n_this, n_prev, n_overlap = calc_overlapping_points(this_objid,prev_objid,objdir)
+                n_this, n_prev, n_overlap = calc_overlapping_points(this_objid,prev_objid,objdir, fmt=fmt)
 
                 if n_overlap >= options['min_overlap_points']:
                     match=jj
@@ -535,13 +536,19 @@ def overlap_forward_backward(LPT1, LPT2, options, verbose=True):
     LPT3[:,3] = LPT1[:,3] * LPT2[:,4]  ## Begin - begin (end) points in forward (backwards)
     LPT3[:,4] = LPT1[:,4] * LPT2[:,3]  ## End - end (begin) poings in forward (backwards)
     LPT3[:,5] = LPT1[:,5] + LPT2[:,5]  ## Split -- pick up splits identified by forward AND backwards.
+    LPT3[:,6] = 0
 
+    return reorder_LPT_group_id(LPT3)
+
+
+def lpt_group_id_separate_branches(LPT, options, verbose=True):
 
     ##########################################################
     ## Overlapping branches stuff.
     ## Using the "brute force" method of going through time stamp by time stamp.
     ##########################################################
 
+    LPT3 = LPT.copy()
 
     print('Managing overlapping branches.')
 
@@ -551,12 +558,6 @@ def overlap_forward_backward(LPT1, LPT2, options, verbose=True):
         this_lpt_group_idx_all = np.where(LPT3[:,2] == this_lpt_group)[0]
         this_lpt_time_stamps_all = np.sort(np.unique(LPT3[this_lpt_group_idx_all,0]))
 
-        ## Skip this group if it only has one branch.
-        if len(np.unique(LPT3[this_lpt_group_idx_all,6])) < 2:
-            continue
-
-        ## OK, more than two branches. Reset all branches and start from scratch:(
-        LPT3[this_lpt_group_idx_all,6] = 0
         next_new_branch = 0
 
         this_lpt_group_idx_begin_points = np.where(np.logical_and(LPT3[:,2] == this_lpt_group, LPT3[:,3] == 1))[0]
@@ -599,7 +600,6 @@ def overlap_forward_backward(LPT1, LPT2, options, verbose=True):
 
                         for ii in range(len(lpt_indices_at_this_time)):
                             this_objid = LPT3[lpt_indices_at_this_time[ii],1]
-                            #print(str(int(this_objid)))
                             n_this, n_prev, n_overlap = calc_overlapping_points(this_objid,prev_objid,options['objdir'])
                             match = False
                             if n_overlap >= options['min_overlap_points']:
@@ -613,13 +613,11 @@ def overlap_forward_backward(LPT1, LPT2, options, verbose=True):
                                 matches_this_branch[ii] = 1 # I should always find at least 1 match here.
                                 if not lpt_indices_at_this_time[ii] in already_matched_indices:
                                     lpt_indices_at_this_time_matches.append(lpt_indices_at_this_time[ii])
-                        #print(lpt_indices_at_this_time_matches)
 
-                        if len(lpt_indices_at_this_time_matches) > 1:
+                        if len(lpt_indices_at_this_time_matches) < 1:
+                            continue # Should only happen if it is a center jump situation.
 
-                            move_forward_idx = lpt_indices_at_this_time_matches[0]
-                        else:
-                            move_forward_idx = lpt_indices_at_this_time_matches[0]
+                        move_forward_idx = lpt_indices_at_this_time_matches[0] # Always take the first (e.g., leftmost) available direction.
 
                         LPT3[move_forward_idx,6] = int(LPT3[move_forward_idx,6]) | int(2**current_branch) # Bitwise or
 
@@ -629,9 +627,11 @@ def overlap_forward_backward(LPT1, LPT2, options, verbose=True):
                             for kk in idx_with_this_branch:
                                 if kk in already_matched_indices:
                                     already_matched_indices.remove(kk)
-                                    more_to_do = True
+                            more_to_do = True
 
-                        already_matched_indices.append(move_forward_idx)
+                        if len(lpt_indices_at_this_time_matches) > 1:
+                            already_matched_indices.append(move_forward_idx)
+
                         prev_objid = 1 * LPT3[move_forward_idx,1]
                         prev_idx = 1 * move_forward_idx
 
@@ -639,13 +639,14 @@ def overlap_forward_backward(LPT1, LPT2, options, verbose=True):
                         if LPT3[move_forward_idx,4] == 1:
                             break
 
+                #if niter > 0:
+                #    more_to_do = False
                 #print(more_to_do)
 
+    return LPT3
 
-    return reorder_LPT_group_id(LPT3)
 
-
-def lpt_group_array_allow_center_jumps(LPT, options):
+def lpt_group_array_allow_center_jumps(LPT, options, fmt="/%Y/%m/%Y%m%d/objects_%Y%m%d%H.nc"):
     """
     Check duration of "end" (e.g., "this") to "start" points (e.g., "other"), and connect if less than
     center_jump_max_hours.
@@ -683,7 +684,7 @@ def lpt_group_array_allow_center_jumps(LPT, options):
 
                             ## If I got here, the timing is OK for a center jump.
                             ## Now, check the overlapping criteria.
-                            n_this, n_prev, n_overlap = calc_overlapping_points(this_objid,other_objid,options['objdir'])
+                            n_this, n_prev, n_overlap = calc_overlapping_points(this_objid,other_objid,options['objdir'], fmt=fmt)
                             match = False
                             if n_overlap >= options['min_overlap_points']:
                                 match=True
@@ -695,6 +696,9 @@ def lpt_group_array_allow_center_jumps(LPT, options):
                             if match:
                                 ## I found a center jump! Add it to "this group"
                                 LPT2[other_group_all_idx, 2] = this_lpt_group
+                                LPT2[other_idx, 3] = 0 # No longer the beginning of the track.
+                                LPT2[this_idx, 4] = 0  # No longer the end of the track.
+
                                 more_to_do = True
                                 break                                       # 4
 
@@ -711,11 +715,36 @@ def lpt_group_array_allow_center_jumps(LPT, options):
 
 
 
+def lpt_branches_difference(LPT, group_id, branch_id_int1, branch_id_int2):
+    """
+    Return the ROW indices that are in branch_id2 but NOT in branch_id1.
+    branch IDs are INTEGER values, not binary.
+    Needs LPT (2-d LPT array) and group_id as input.
+    """
+    idx1 = [x for x in range(len(LPT[:,0])) if LPT[x,2] == group_id and (int(LPT[x,6]) & 2**int(branch_id_int1-1))]
+    idx2 = [x for x in range(len(LPT[:,0])) if LPT[x,2] == group_id and (int(LPT[x,6]) & 2**int(branch_id_int2-1))]
+    idx_diff = sorted(list(set(idx2) - set(idx1)))
+    return idx_diff
+
+
+
+def lpt_branches_intersection(LPT, group_id, branch_id_int1, branch_id_int2):
+    """
+    Return the ROW indices that are in branch_id2 but NOT in branch_id1.
+    branch IDs are INTEGER values, not binary.
+    Needs LPT (2-d LPT array) and group_id as input.
+    """
+    idx1 = [x for x in range(len(LPT[:,0])) if LPT[x,2] == group_id and (int(LPT[x,6]) & 2**int(branch_id_int1-1))]
+    idx2 = [x for x in range(len(LPT[:,0])) if LPT[x,2] == group_id and (int(LPT[x,6]) & 2**int(branch_id_int2-1))]
+    idx_intersect = sorted(list(set(idx2).intersection(set(idx1))))
+    return idx_intersect
+
+
+
 
 def lpt_split_and_merge(LPT, merge_split_options):
     ## TODO: Add code for splits and mergers here.
     return LPT
-
 
 
 def remove_short_lived_systems(LPT, minimum_duration_hours, latest_datetime = dt.datetime(2063,4,5,0,0,0)):
@@ -767,7 +796,7 @@ def reorder_LPT_group_id(LPT):
 
 
 
-def calc_lpt_system_group_properties(LPT, options):
+def calc_lpt_system_group_properties(LPT, options, fmt="/%Y/%m/%Y%m%d/objects_%Y%m%d%H.nc"):
 
     unique_lpt_groups = np.unique(LPT[:,2])
 
@@ -805,7 +834,7 @@ def calc_lpt_system_group_properties(LPT, options):
 
             for this_objid in LPT[idx_for_this_time,1]:
 
-                OBJ = read_lp_object_properties(this_objid, options['objdir'], ['centroid_lon','centroid_lat','area','pixels_x','pixels_y'])
+                OBJ = read_lp_object_properties(this_objid, options['objdir'], ['centroid_lon','centroid_lat','area','pixels_x','pixels_y'], fmt=fmt)
 
                 TC_this['nobj'][tt] += 1
                 TC_this['area'][tt] += OBJ['area']
@@ -827,11 +856,69 @@ def separate_lpt_system_branches(LPTfb, LPTf, LPTb, options):
     LPT_with_branches = LPTfb.copy() # Start with forward/backwards merged system.
 
 
-def calc_lpt_system_group_properties_with_branches(LPT_with_branches, options):
-    pass
-    """
-    TODO: NOT YET IMPLEMENTED.
-    """
+def get_branches_in_lpt_group(LPT, lpt_group_id):
+    branches = 0
+    for idx in [x for x in range(len(LPT[:,0])) if LPT[x,2] == lpt_group_id]:
+        branches = int(branches) | int(LPT[idx,6])
+    return  get_group_branches_as_list(branches)
+
+
+def calc_lpt_system_group_properties_with_branches(LPT, options, fmt="/%Y/%m/%Y%m%d/objects_%Y%m%d%H.nc"):
+    unique_lpt_groups = np.unique(LPT[:,2])
+
+    TC_all = []
+
+    for this_group in unique_lpt_groups:
+
+        this_branch_list = get_branches_in_lpt_group(LPT, this_group)
+
+        for this_branch in this_branch_list:
+            TC_this = {}
+            TC_this['lpt_group_id'] = this_group
+            TC_this['lpt_id'] = this_group + this_branch / 100.0
+
+            this_lpt_group_idx = [x for x in range(len(LPT[:,0])) if LPT[x,2] == this_group and (int(LPT[x,6]) & int(2**(this_branch-1)))]
+            TC_this['objid'] = LPT[this_lpt_group_idx,1]
+            TC_this['timestamp'] = np.unique(LPT[this_lpt_group_idx,0])
+            TC_this['datetime'] = [dt.datetime.fromtimestamp(x) for x in TC_this['timestamp']]
+
+            ##
+            ## Sum/average the LPTs to get bulk/mean properties at each time.
+            ##
+
+            ## Initialize
+            TC_this['nobj'] = np.zeros(len(TC_this['timestamp']))
+            TC_this['area'] = np.zeros(len(TC_this['timestamp']))
+            TC_this['centroid_lon'] = np.zeros(len(TC_this['timestamp']))
+            TC_this['centroid_lat'] = np.zeros(len(TC_this['timestamp']))
+            TC_this['min_lon'] =  999.0 * np.ones(len(TC_this['timestamp']))
+            TC_this['max_lon'] = -999.0 * np.ones(len(TC_this['timestamp']))
+            TC_this['min_lat'] =  999.0 * np.ones(len(TC_this['timestamp']))
+            TC_this['max_lat'] = -999.0 * np.ones(len(TC_this['timestamp']))
+
+            ## Loop over time.
+            for tt in range(len(TC_this['timestamp'])):
+                #idx_for_this_time = np.where(np.logical_and(
+                #    LPT[:,0] == TC_this['timestamp'][tt],
+                #    LPT[:,2] == this_group))[0]
+
+                idx_for_this_time = [x for x in range(len(LPT[:,0])) if (LPT[x,0] == TC_this['timestamp'][tt]) and (LPT[x,2] == this_group) and (int(LPT[x,6]) & int(2**(this_branch-1)))]
+
+                for this_objid in LPT[idx_for_this_time,1]:
+
+                    OBJ = read_lp_object_properties(this_objid, options['objdir'], ['centroid_lon','centroid_lat','area','pixels_x','pixels_y'])
+
+                    TC_this['nobj'][tt] += 1
+                    TC_this['area'][tt] += OBJ['area']
+                    TC_this['centroid_lon'][tt] += OBJ['centroid_lon'] * OBJ['area']
+                    TC_this['centroid_lat'][tt] += OBJ['centroid_lat'] * OBJ['area']
+
+                TC_this['centroid_lon'][tt] /= TC_this['area'][tt]
+                TC_this['centroid_lat'][tt] /= TC_this['area'][tt]
+
+            TC_all.append(TC_this)
+
+    return TC_all
 
 
 

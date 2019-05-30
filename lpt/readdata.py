@@ -3,6 +3,7 @@ from netCDF4 import Dataset
 import struct
 import sys
 import os
+import gdal
 
 """
 This module contains functions for reading external data
@@ -233,4 +234,179 @@ def read_tmpa_at_datetime(dt, force_rt=False, verbose=False):
         if verbose:
             print(fn)
         DATA=read_tmpa_rt_bin(fn)
+    return DATA
+
+"""
+CFS Grib2 reading function
+"""
+
+def read_cfs_rt_at_datetime(dt, records=range(1,45*4+1), verbose=False):
+
+    YYYY = dt.strftime("%Y")
+    MM = dt.strftime("%m")
+    DD = dt.strftime("%d")
+    HH = dt.strftime("%H")
+    YMD = YYYY + MM + DD
+
+    ## First try research product
+    fn = ('/home/orca/data/model_fcst_grib/cfs/cfs.'
+       +YMD+'/'+HH+'/time_grib_01/prate.01.'+ YMD + HH + '.daily.grb2')
+
+    if verbose:
+        print(fn, flush=True)
+
+    return read_cfs_rt_grib2(fn, records=records, verbose=verbose)
+
+
+def read_cfs_rt_grib2(fn, records=range(1,45*4+1), verbose=False):
+    """
+    RT = read_cfs_rt_grib2(fn, records=N)
+
+    N is the list of records to get.
+    By default, get the first 45 days, 6 hourly intervals.
+
+    example output:
+    In [23]: RT['lon'].shape
+    Out[23]: (384,)
+
+    In [24]: RT['lat'].shape
+    Out[24]: (190,)
+
+    In [25]: RT['precip'].shape
+    Out[25]: (180, 190, 384)
+    """
+
+    DS = gdal.Open(fn, gdal.GA_ReadOnly)
+    width = DS.RasterXSize
+    height = DS.RasterYSize
+    lon =  np.arange(0.0,359.062 + 0.5,0.938)
+    ## grid file with Gaussian latitude was obtained from wgrib2 like this:
+    ## wgrib2 -d 1 -gridout grid.txt /home/orca/data/model_fcst_grib/cfs/cfs.20190508/00/time_grib_01/prate.01.2019050800.daily.grb2
+    ## awk -F, '{print $3}' grid.txt | uniq | tr "\n" ", "
+    lat = np.flip(np.array([-89.277, -88.340, -87.397, -86.454, -85.509
+                , -84.565, -83.620, -82.676, -81.731, -80.786
+                , -79.841, -78.897, -77.952, -77.007, -76.062
+                , -75.117, -74.173, -73.228, -72.283, -71.338
+                , -70.393, -69.448, -68.503, -67.559, -66.614
+                , -65.669, -64.724, -63.779, -62.834, -61.889
+                , -60.945, -60.000, -59.055, -58.110, -57.165
+                , -56.220, -55.275, -54.330, -53.386, -52.441
+                , -51.496, -50.551, -49.606, -48.661, -47.716
+                , -46.771, -45.827, -44.882, -43.937, -42.992
+                , -42.047, -41.102, -40.157, -39.212, -38.268
+                , -37.323, -36.378, -35.433, -34.488, -33.543
+                , -32.598, -31.653, -30.709, -29.764, -28.819
+                , -27.874, -26.929, -25.984, -25.039, -24.094
+                , -23.150, -22.205, -21.260, -20.315, -19.370
+                , -18.425, -17.480, -16.535, -15.590, -14.646
+                , -13.701, -12.756, -11.811, -10.866, -9.921
+                , -8.976, -8.031, -7.087, -6.142, -5.197
+                , -4.252, -3.307, -2.362, -1.417, -0.472
+                , 0.472, 1.417, 2.362, 3.307, 4.252
+                , 5.197, 6.142, 7.087, 8.031, 8.976
+                , 9.921, 10.866, 11.811, 12.756, 13.701
+                , 14.646, 15.590, 16.535, 17.480, 18.425
+                , 19.370, 20.315, 21.260, 22.205, 23.150
+                , 24.094, 25.039, 25.984, 26.929, 27.874
+                , 28.819, 29.764, 30.709, 31.653, 32.598
+                , 33.543, 34.488, 35.433, 36.378, 37.323
+                , 38.268, 39.212, 40.157, 41.102, 42.047
+                , 42.992, 43.937, 44.882, 45.827, 46.771
+                , 47.716, 48.661, 49.606, 50.551, 51.496
+                , 52.441, 53.386, 54.330, 55.275, 56.220
+                , 57.165, 58.110, 59.055, 60.000, 60.945
+                , 61.889, 62.834, 63.779, 64.724, 65.669
+                , 66.614, 67.559, 68.503, 69.448, 70.393
+                , 71.338, 72.283, 73.228, 74.173, 75.117
+                , 76.062, 77.007, 77.952, 78.897, 79.841
+                , 80.786, 81.731, 82.676, 83.620, 84.565
+                , 85.509, 86.454, 87.397, 88.340, 89.277]), axis=0)
+
+
+    num_list = []
+    for band in records:
+        if verbose:
+            print('Record #' + str(band), flush=True)
+        data_array = DS.GetRasterBand(band).ReadAsArray()
+        for row in data_array:
+            for value in row:
+                num_list.append(value*3600.0) # kg/m2/sec --> mm/h
+
+    DS = None # Close the file.
+
+    precip = np.array(num_list).reshape([len(records), len(lat), len(lon)])
+
+    DATA={}
+    DATA['lon'] = lon
+    DATA['lat'] = lat
+    DATA['precip'] = precip
+
+    return DATA
+
+
+def read_cfs_historical_grib2(fn):
+    """
+    RT = read_cfs_historical_grib2(fn)
+
+    example output:
+    In [23]: RT['lon'].shape
+    Out[23]: (384,)
+
+    In [24]: RT['lat'].shape
+    Out[24]: (190,)
+
+    In [25]: RT['precip'].shape
+    Out[25]: (180, 190, 384)
+    """
+
+    DS = gdal.Open(fn, gdal.GA_ReadOnly)
+    width = DS.RasterXSize
+    height = DS.RasterYSize
+    lon =  np.arange(0.0,359.51,0.5)
+    lat =  np.arange(-90.0,90.01,0.5)
+    n_records = DS.RasterCount
+
+    num_list = []
+    for band in range(1, n_records+1):
+        print((str(band) + ' of ' + str(n_records)))
+        data_array = DS.GetRasterBand(band).ReadAsArray()
+        for row in data_array:
+            for value in row:
+                num_list.append(value)
+
+    DS = None # Close the file.
+
+    precip = np.array(num_list).reshape([int(n_records/6), 6, len(lat), len(lon)])
+    #precip /= 1e6  # Values in file are multiplied by 1e6.
+                   # kg/m2 in 1h is equivalent to mm/h.
+
+    DATA={}
+    DATA['lon'] = lon
+    DATA['lat'] = lat
+    DATA['precip'] = precip
+
+    return DATA
+
+
+
+def get_cfs_historical_3h_rain(fn):
+
+    """
+    Read in the rainfall using read_cfs_historical_grib2(fn)
+    Then calculate the 3 hourly rain (mm/h) and return it.
+    """
+
+    F = read_cfs_historical_grib2(fn)
+    precip_shape = F['precip'].shape
+
+    precip3hr = np.zeros((2*precip_shape[0], precip_shape[2], precip_shape[3]))
+
+    precip3hr[0::2,:,:] = np.mean(F['precip'][:,0:3,:,:], axis=1)
+    precip3hr[1::2,:,:] = np.mean(F['precip'][:,3:6,:,:], axis=1)
+
+    DATA={}
+    DATA['lon'] = F['lon']
+    DATA['lat'] = F['lat']
+    DATA['precip'] = precip3hr
+
     return DATA

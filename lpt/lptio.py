@@ -125,7 +125,7 @@ def lpt_system_tracks_output_ascii(fn, TIMECLUSTERS):
 
     ## Data
     for ii in range(len(TIMECLUSTERS)):
-        file.write("LPT %07.2f\n" % (ii,))
+        file.write("LPT %07.2f\n" % (TIMECLUSTERS[ii]['lpt_id'],))
 
         for tt in range(len(TIMECLUSTERS[ii]['datetime'])):
             year,month,day,hour = TIMECLUSTERS[ii]['datetime'][tt].timetuple()[0:4]

@@ -8,6 +8,7 @@ import os
 import matplotlib.colors as colors
 import scipy.ndimage
 
+## This driver script is for analysis or data, e.g., going backward in time.
 
 def lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,merge_split_options,argv):
 
@@ -98,7 +99,7 @@ def lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,merge_s
                         , plot_area = plotting['plot_area'])
                 ax1.set_title((dataset['label'].upper() + ' RT '
                                 + str(lpo_options['accumulation_hours'])
-                                + '-h Rain Rate and LP Objects\n' + YMDH_fancy))
+                                + '-h Rain Rate and LP Objects\nEnding ' + YMDH_fancy))
 
                 img_dir1 = (output['img_dir'] + '/' + dataset['label'] + '/objects/'
                                 + end_of_accumulation_time.strftime(output['sub_directory_format']))
@@ -156,9 +157,9 @@ def lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,merge_s
         print(('Allow center jumps up to ' + str(options['center_jump_max_hours']) + ' hours.'))
         LPT_center_jumps = lpt.helpers.lpt_group_array_allow_center_jumps(LPTfb, options)
 
-        if merge_split_options['allow_merge_split']:
-            print('Doing splits and mergers.')
-            LPT_center_jumps = lpt.helpers.lpt_split_and_merge(LPT_center_jumps.copy(), merge_split_options)
+        #if merge_split_options['allow_merge_split']:
+        #    print('Doing splits and mergers.')
+        #    LPT_center_jumps = lpt.helpers.lpt_split_and_merge(LPT_center_jumps.copy(), merge_split_options)
 
         ## Eliminate short duration systems.
         print(('Remove LPT shorter than ' + str(options['min_lpt_duration_hours']) + ' hours.'))
@@ -200,7 +201,7 @@ def lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,merge_s
                 , accum_time_hours = lpo_options['accumulation_hours'])
 
         ax2.set_title((dataset['label'].upper() + ' RT '
-                        + '15S-15N Rain Rate and LPTs\n' + YMDH_fancy))
+                        + '15S-15N Rain Rate and LPTs\n' + str(lpt_options['lpt_history_days']) + ' Days Ending: ' + YMDH_fancy))
 
         img_dir2 = (output['img_dir'] + '/' + dataset['label'] + '/systems/'
                         + end_of_accumulation_time.strftime(output['sub_directory_format']))

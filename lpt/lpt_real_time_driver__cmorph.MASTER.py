@@ -78,4 +78,4 @@ lpt_options['center_jump_max_hours'] = 3*24   # How long to allow center jumps
 Call the real time driver function.
 """
 
-lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,sys.argv)
+lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options, None, sys.argv)

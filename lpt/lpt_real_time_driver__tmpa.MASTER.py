@@ -84,4 +84,4 @@ merge_split_options{'split_merger_min_hours'} = 72     # Min duration of a split
 Call the real time driver function.
 """
 
-lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,merge_split_options,sys.argv)
+lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,merge_split_options,None, sys.argv)

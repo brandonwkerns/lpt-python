@@ -1,7 +1,8 @@
 import matplotlib; matplotlib.use('agg')
 import numpy as np
 from context import lpt
-import matplotlib.pylab as plt
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import datetime as dt
 import sys
 import os
@@ -75,7 +76,7 @@ def print_and_save(file_out_base):
 ####################################################################
 """
 
-def plot_rain_map_with_filtered_contour(ax, DATA_ACCUM, OBJ, plot_area=[50, 200, -30, 30]):
+def plot_rain_map_with_filtered_contour(ax, DATA_ACCUM, OBJ, plot_area=[50, 200, -30, 30], label_font_size=10):
     lon = OBJ['grid']['lon']
     lat = OBJ['grid']['lat']
 
@@ -89,18 +90,25 @@ def plot_rain_map_with_filtered_contour(ax, DATA_ACCUM, OBJ, plot_area=[50, 200,
     Hobj = plt.contour(lon, lat, label_im, [0.5,], colors='k', linewidths=1.0)
 
     map1.plot(OBJ['lon'], OBJ['lat'], 'kx', markersize=7)
-    CB = plt.colorbar(H1)
+    cax = plt.gcf().add_axes([0.92, 0.2, 0.025, 0.6])
+    CB = plt.colorbar(H1, cax=cax)
+    CB.set_label(label='Rain Rate [mm/day]', fontsize=label_font_size)
+    CB.ax.tick_params(labelsize=label_font_size)
     return (map1, H1, Hobj, CB)
 
 
-def plot_timelon_with_lpt(ax2, dt_list, lon, timelon_rain, TIMECLUSTERS, lon_range, accum_time_hours = 0):
+def plot_timelon_with_lpt(ax2, dt_list, lon, timelon_rain, TIMECLUSTERS
+        , lon_range, accum_time_hours = 0, label_font_size=10):
 
     cmap = cmap_map(lambda x: x/2 + 0.5, plt.cm.jet)
     cmap.set_under(color='white')
     timelon_rain = np.array(timelon_rain)
     timelon_rain[timelon_rain < 0.1] = np.nan
     Hrain = ax2.pcolormesh(lon, dt_list, timelon_rain, vmin=0.0, vmax=1.5, cmap=cmap)
-    cbar = plt.colorbar(Hrain)
+    cax = plt.gcf().add_axes([0.95, 0.2, 0.025, 0.6])
+    cbar = plt.colorbar(Hrain, cax=cax)
+    cbar.set_label(label='Rain Rate [mm/h]', fontsize=label_font_size)
+    cbar.ax.tick_params(labelsize=label_font_size)
 
     for ii in range(len(TIMECLUSTERS)):
         x = TIMECLUSTERS[ii]['centroid_lon']
@@ -113,6 +121,13 @@ def plot_timelon_with_lpt(ax2, dt_list, lon, timelon_rain, TIMECLUSTERS, lon_ran
         ax2.text(x[-1], y[-1], str(int(ii)), fontweight='bold', color='k',clip_on=True, fontsize=14, ha='center', va='bottom')
 
     ax2.set_xlim(lon_range)
+    yticks = [dt_list[0] + dt.timedelta(days=x) for x in range(0, (dt_list[-1] - dt_list[0]).days + 1 ,7)]
     ax2.set_ylim([dt_list[0], dt_list[-1]])
+    ax2.set_yticks(yticks)
+    ax2.yaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
+    ax2.grid(linestyle='--', linewidth=0.5, color='k')
+    ax2.set_xlabel('Longitude', fontsize=label_font_size)
+    plt.xticks(fontsize=label_font_size)
+    plt.yticks(fontsize=label_font_size)
 
     return (Hrain)
