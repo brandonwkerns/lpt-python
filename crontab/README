@@ -5,3 +5,5 @@ cp lpt.cron.MASTER lpt.cron
 cp lpt_contab_wrapper.MASTER.sh lpt_contab_wrapper.sh
 cp download_cmorph_rt.MASTER.sh download_cmorph_rt.sh
 cp download_tmpa_rt.MASTER.sh download_tmpa_rt.sh
+cp download_cfs_rt.MASTER.sh download_cfs_rt.sh
+
