@@ -1,5 +1,6 @@
 #Min H D M DoW /home/orca/scripts/script.sh
 0 */3 * * * /home/orca/bkerns/lib/lpt/lpt-python/crontab/download_tmpa_rt.sh >& /home/orca/bkerns/lib/lpt/lpt-python/crontab/download.tmpa.rt.crontab.log
+20 *12 * * * /home/orca/bkerns/lib/lpt/lpt-python/crontab/download_cfs_rt.sh >& /home/orca/bkerns/lib/lpt/lpt-python/crontab/download.cfs.rt.crontab.log
 10 */3 * * * /home/orca/bkerns/lib/lpt/lpt-python/crontab/download_cmorph_rt.sh >& /home/orca/bkerns/lib/lpt/lpt-python/crontab/download.cmorph.rt.crontab.log
 30 */3 * * * export $DISPLAY=:0 ; /home/orca/bkerns/lib/lpt/lpt-python/crontab/lpt_contab_wrapper.sh >& /home/orca/bkerns/lib/lpt/lpt-python/crontab/run.rt.crontab.log
 #00 14 * * * export $DISPLAY=:0 ; /home/orca/bkerns/lib/lpt/lpt-python/crontab/lpt_contab_wrapper.sh >& /home/orca/bkerns/lib/lpt/lpt-python/crontab/run.rt.crontab.log
