@@ -14,7 +14,7 @@ can feel free to modify. See README files in the lpt/ and crontab/ directories.
 - numpy
 - scipy.signal, scipy.ndimage
 - NetCDF4.Dataset
-
+- gdal (for reading grib files)
 
 ## Code organization:
 - Real time data download scripts, crontab setup, and log files are in crontab/.
