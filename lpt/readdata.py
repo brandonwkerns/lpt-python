@@ -4,6 +4,8 @@ import struct
 import sys
 import os
 import gdal
+import datetime as dt
+import glob
 
 """
 This module contains functions for reading external data
@@ -344,9 +346,9 @@ def read_cfs_rt_grib2(fn, records=range(1,45*4+1), verbose=False):
     return DATA
 
 
-def read_cfs_historical_grib2(fn):
+def read_cfsr_grib2(fn, band_list=None, verbose=False):
     """
-    RT = read_cfs_historical_grib2(fn)
+    RT = read_cfsr_grib2(fn)
 
     example output:
     In [23]: RT['lon'].shape
@@ -363,12 +365,17 @@ def read_cfs_historical_grib2(fn):
     width = DS.RasterXSize
     height = DS.RasterYSize
     lon =  np.arange(0.0,359.51,0.5)
-    lat =  np.arange(-90.0,90.01,0.5)
+    lat =  np.arange(90.0,-90.01,-0.5)
     n_records = DS.RasterCount
 
     num_list = []
-    for band in range(1, n_records+1):
-        print((str(band) + ' of ' + str(n_records)))
+
+    if band_list is None:
+        band_list = range(1, n_records+1)
+
+    for band in band_list:
+        if verbose:
+            print((str(band) + ' of ' + str(n_records)))
         data_array = DS.GetRasterBand(band).ReadAsArray()
         for row in data_array:
             for value in row:
@@ -376,7 +383,7 @@ def read_cfs_historical_grib2(fn):
 
     DS = None # Close the file.
 
-    precip = np.array(num_list).reshape([int(n_records/6), 6, len(lat), len(lon)])
+    precip = np.array(num_list).reshape([int(len(band_list)/6), 6, len(lat), len(lon)])
     #precip /= 1e6  # Values in file are multiplied by 1e6.
                    # kg/m2 in 1h is equivalent to mm/h.
 
@@ -387,26 +394,176 @@ def read_cfs_historical_grib2(fn):
 
     return DATA
 
-
-
-def get_cfs_historical_3h_rain(fn):
+def get_cfsr_6h_rain(dt_ending, verbose=False):
 
     """
     Read in the rainfall using read_cfs_historical_grib2(fn)
-    Then calculate the 3 hourly rain (mm/h) and return it.
+    Then calculate the 6 hourly rain rate (mm/h) and return it.
+
+    CFSR rain is stored in monthly files. It it initialized every 6 h,
+    and the data provide hourly accumulations (in kg/m^2, equivalent to mm) like this:
+
+    1:0:d=2011120100:APCP:surface:0-1 hour acc fcst:
+    2:94325:d=2011120100:APCP:surface:1-2 hour acc fcst:
+    3:193206:d=2011120100:APCP:surface:2-3 hour acc fcst:
+    4:309596:d=2011120100:APCP:surface:3-4 hour acc fcst:
+    5:421187:d=2011120100:APCP:surface:4-5 hour acc fcst:
+    6:537704:d=2011120100:APCP:surface:5-6 hour acc fcst:
+
+    To get the 6 hourly accumulation, all 6 of these need to be added.
+    Then take the mean (e.g., divide by 6h) to get mm/h.
     """
 
-    F = read_cfs_historical_grib2(fn)
-    precip_shape = F['precip'].shape
+    dt_beginning = dt_ending - dt.timedelta(hours=6)
 
-    precip3hr = np.zeros((2*precip_shape[0], precip_shape[2], precip_shape[3]))
+    if dt_beginning < dt.datetime(2011,3,31,23,59,0):
+        fn_beginning = ('/home/orca/data/model_anal/cfsr/rain_accum/' + dt_beginning.strftime('%Y')
+            + '/apcp.gdas.' + dt_beginning.strftime('%Y%m') + '.grb2')
+    else:
+        fn_beginning = ('/home/orca/data/model_anal/cfsr/rain_accum/' + dt_beginning.strftime('%Y')
+            + '/apcp.cdas1.' + dt_beginning.strftime('%Y%m') + '.grb2')
 
-    precip3hr[0::2,:,:] = np.mean(F['precip'][:,0:3,:,:], axis=1)
-    precip3hr[1::2,:,:] = np.mean(F['precip'][:,3:6,:,:], axis=1)
+    if verbose:
+        print(fn_beginning, flush=True)
+
+    rec_num = 1 + int((dt_beginning - dt.datetime(dt_beginning.year, dt_beginning.month,1,0,0,0)).total_seconds()/3600.0)
+    F = read_cfsr_grib2(fn_beginning, band_list=range(rec_num,rec_num+6,1), verbose=verbose)
+
+    precip6hr = np.nanmean(F['precip'], axis=1)[0]
 
     DATA={}
     DATA['lon'] = F['lon']
     DATA['lat'] = F['lat']
-    DATA['precip'] = precip3hr
+    DATA['precip'] = precip6hr
+
+    return DATA
+
+
+def read_era5_nc(fn, init_time_list=None, fcst_list=range(19), verbose=False):
+    """
+    RT = read_era5_nc(fn)
+
+    Units are accumulation in meters for a 1 h forecast period.
+    (forecast time 0 is "initialization", which seems to [and should be!] always be zero.)
+    """
+    DS = Dataset(fn)
+    lon =  DS['longitude'][:]
+    lat =  DS['latitude'][:]
+
+    ## Read precip. Use init forecast time list, if provided. Otherwise, return all initializations.
+    if init_time_list is None:
+        precip = DS['TP'][:,fcst_list,:,:]
+    else:
+        precip = DS['TP'][init_time_list,fcst_list,:,:]
+
+    DS.close() # Close the file.
+
+    DATA={}
+    DATA['lon'] = lon
+    DATA['lat'] = lat
+    DATA['precip'] = precip
+
+    return DATA
+
+
+def get_era5_12h_rain(dt_ending, verbose=False):
+
+    """
+    Read in the rainfall using read_era5_nc(fn)
+    Then calculate the 12 hourly rain rate (mm/h) and return it.
+    """
+
+    dt_beginning = dt_ending - dt.timedelta(hours=18)
+
+    if dt_beginning < dt.datetime(dt_beginning.year, dt_beginning.month,1,5,59,0):
+        dt00 = dt_beginning - dt.timedelta(month=1)
+        dt0 = dt.datetime(dt00.year, dt00.month,16,6,0,0)
+    elif dt_beginning < dt.datetime(dt_beginning.year, dt_beginning.month,16,5,59,0):
+        dt0 = dt.datetime(dt_beginning.year, dt_beginning.month,1,6,0,0)
+    else:
+        dt0 = dt.datetime(dt_beginning.year, dt_beginning.month,16,6,0,0)
+
+    fn = glob.glob('/home/orca/data/model_anal/era5/rain_accum/e5.oper.fc.sfc.accumu.128_228_tp.regn320sc.'+dt0.strftime('%Y%m%d%H')+'*.nc')[0]
+
+    if verbose:
+        print(fn, flush=True)
+
+
+    init_time_indx = int((dt_beginning - dt0).total_seconds()/(12*3600))  # 12h increments from beginning of file.
+
+    F = read_era5_nc(fn, init_time_list=(init_time_indx,), fcst_list=range(6,19), verbose=verbose)
+
+    precip12hr = 1000.0 * np.nanmean(F['precip'], axis=1)[0] # m to mm
+
+    DATA={}
+    DATA['lon'] = F['lon']
+    DATA['lat'] = F['lat']
+    DATA['precip'] = precip12hr
+
+    return DATA
+
+
+def get_merra2_6h_rain(dt_ending, verbose=False
+        , raw_data_parent_dir='/home/orca/asavarin/LPT/MERRA2'):
+
+    """
+    Read in the 6 h MERRA2 rainfall from the daily files with hourly data.
+
+    MERRA2 hourly rain rate is from the data increment update (IAU) step
+    of the assimilation cycle. It is a six hour analysis cycle, with the IAU period
+    +-3h from the analysis point. The valid time for the rain rate is
+    on the half hour, e.g., 0:30, 1:30, ect. Therefore, as an example,
+    for 6 UTC, I use 3:30, 4:30, 5:30, 6:30, 7:30, and 8:30. These are time
+    indices range(2:8) in the daily file.
+
+    Comment: To be most consistent with TRMM, this might use just the 5:30 time.
+    However, other model analyis products tend to be for accumulation over 6-12 h.
+    Finally, I use the 3 day accumulation for LPT.
+
+    Also: I am using PRECTOT for now. This is the raw output from the IAU step.
+    this has known issues over tropics land!
+    Potentially, I could use the PRECTOTCORR (corrected to obs over land) instead.
+    """
+
+    dt_list = [dt_ending + dt.timedelta(hours=x) for x in range(-3,3,1)]
+
+    lon = None
+    lat = None
+    precip = None
+
+    for this_dt in dt_list:
+
+        fn = glob.glob(raw_data_parent_dir
+            + '/MERRA2_*.tavg1_2d_flx_Nx.'+this_dt.strftime('%Y%m%d')+'.SUB.nc')[0]
+
+        if verbose:
+            print(fn)
+            print(int(this_dt.hour), flush=True)
+
+        DS = Dataset(fn)
+
+        if lon is None:
+            lon = DS['lon'][:]
+        if lat is None:
+            lat = DS['lat'][:]
+
+        if precip is None:
+            precip = DS['PRECTOT'][int(this_dt.hour),:,:]
+        else:
+            precip += DS['PRECTOT'][int(this_dt.hour),:,:]
+
+    precip = precip/6.0
+    precip *= 3600.0   # kg m-2 s-1 = mm s-1 ==? mm h-1
+
+    ## (-180 180) --> (0 360)
+    idx_lt_0 = [ii for ii in range(len(lon)) if lon[ii] < -0.001]
+    idx_lt_0_max = np.max(idx_lt_0)
+    lon = np.append(lon[idx_lt_0_max+1:], 360.0 + lon[:idx_lt_0_max+1])
+    precip = np.append(precip[:,idx_lt_0_max+1:], precip[:,:idx_lt_0_max+1], axis=1)
+
+    DATA={}
+    DATA['lon'] = lon
+    DATA['lat'] = lat
+    DATA['precip'] = precip
 
     return DATA
