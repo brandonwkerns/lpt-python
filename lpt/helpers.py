@@ -110,11 +110,17 @@ def calculate_lp_object_properties(lon, lat, field, field_accum, label_im
     sizes = ndimage.sum(mask, label_im, range(1, nb_labels + 1))
     mean_instantaneous_rain_rate = ndimage.mean(field, label_im, range(1, nb_labels + 1))
     mean_accum_rain_rate = ndimage.mean(field_accum, label_im, range(1, nb_labels + 1))
+    max_instantaneous_rain_rate = ndimage.maximum(field, label_im, range(1, nb_labels + 1))
+    max_accum_rain_rate = ndimage.maximum(field_accum, label_im, range(1, nb_labels + 1))
     centroid_lon = ndimage.mean(lon2, label_im, range(1, nb_labels + 1))
     centroid_lat = ndimage.mean(lat2, label_im, range(1, nb_labels + 1))
     centroid_x = ndimage.mean(X2, label_im, range(1, nb_labels + 1))
     centroid_y = ndimage.mean(Y2, label_im, range(1, nb_labels + 1))
     area = ndimage.sum(area2d, label_im, range(1, nb_labels + 1))
+    max_lon = ndimage.maximum(lon2, label_im, range(1, nb_labels + 1))
+    min_lon = ndimage.minimum(lon2, label_im, range(1, nb_labels + 1))
+    max_lat = ndimage.maximum(lat2, label_im, range(1, nb_labels + 1))
+    min_lat = ndimage.minimum(lat2, label_im, range(1, nb_labels + 1))
 
 
     ## Assign LPT IDs. Order is by longitude. Use zero-base indexing.
@@ -128,12 +134,18 @@ def calculate_lp_object_properties(lon, lat, field, field_accum, label_im
     OBJ['label_im'] = label_im
     OBJ['lon'] = centroid_lon
     OBJ['lat'] = centroid_lat
+    OBJ['min_lon'] = min_lon
+    OBJ['min_lat'] = min_lat
+    OBJ['max_lon'] = max_lon
+    OBJ['max_lat'] = max_lat
     OBJ['x'] = centroid_x
     OBJ['y'] = centroid_y
     OBJ['n_points'] = sizes
     OBJ['area'] = area
     OBJ['mean_inst'] = mean_instantaneous_rain_rate
     OBJ['mean_accum'] = mean_accum_rain_rate
+    OBJ['max_inst'] = max_instantaneous_rain_rate
+    OBJ['max_accum'] = max_accum_rain_rate
 
     # Grid stuff.
     OBJ['grid'] = {}
@@ -248,13 +260,20 @@ def init_lpt_group_array(dt_list, objdir, fmt = "/%Y/%m/%Y%m%d/objects_%Y%m%d%H.
         print(this_dt)
         fn = (objdir + this_dt.strftime(fmt))
         print(fn)
-        DS = Dataset(fn)
-        print(DS)
-        id_list = DS['objid'][:]
-        DS.close()
+        try:
+            DS = Dataset(fn)
+            #print(DS)
+            try:
+                id_list = DS['objid'][:]
+            except IndexError:
+                id_list = [] # In case of no LPOs at this time.
+            DS.close()
 
-        for ii in range(len(id_list)):
-            LPT.append([this_dt.timestamp(), id_list[ii], -1, 0, 1, 0, int(0)])
+            for ii in range(len(id_list)):
+                LPT.append([this_dt.timestamp(), id_list[ii], -1, 0, 1, 0, int(0)])
+
+        except FileNotFoundError:
+            print('WARNING: Missing this file!')
 
     return np.array(LPT)
 
@@ -826,7 +845,13 @@ def calc_lpt_system_group_properties(LPT, options, fmt="/%Y/%m/%Y%m%d/objects_%Y
         TC_this['min_lat'] =  999.0 * np.ones(len(TC_this['timestamp']))
         TC_this['max_lat'] = -999.0 * np.ones(len(TC_this['timestamp']))
 
-        ## Loop over time.
+        TC_this['mean_inst'] = np.zeros(len(TC_this['timestamp']))
+        TC_this['max_inst'] = -999.0 * np.ones(len(TC_this['timestamp']))
+        TC_this['mean_accum'] = np.zeros(len(TC_this['timestamp']))
+        TC_this['max_accum'] = -999.0 * np.ones(len(TC_this['timestamp']))
+
+
+        ## Loop over unique time stamps.
         for tt in range(len(TC_this['timestamp'])):
             idx_for_this_time = np.where(np.logical_and(
                 LPT[:,0] == TC_this['timestamp'][tt],
@@ -834,15 +859,41 @@ def calc_lpt_system_group_properties(LPT, options, fmt="/%Y/%m/%Y%m%d/objects_%Y
 
             for this_objid in LPT[idx_for_this_time,1]:
 
-                OBJ = read_lp_object_properties(this_objid, options['objdir'], ['centroid_lon','centroid_lat','area','pixels_x','pixels_y'], fmt=fmt)
+                OBJ = read_lp_object_properties(this_objid, options['objdir']
+                    , ['centroid_lon','centroid_lat','area','pixels_x','pixels_y'
+                        ,'min_lon','max_lon','min_lat','max_lat'
+                        ,'mean_inst_rainrate','mean_running_rainrate','max_inst_rainrate','max_running_rainrate'], fmt=fmt)
 
                 TC_this['nobj'][tt] += 1
                 TC_this['area'][tt] += OBJ['area']
                 TC_this['centroid_lon'][tt] += OBJ['centroid_lon'] * OBJ['area']
                 TC_this['centroid_lat'][tt] += OBJ['centroid_lat'] * OBJ['area']
 
+                TC_this['min_lon'][tt] = min((TC_this['min_lon'][tt], OBJ['min_lon']))
+                TC_this['min_lat'][tt] = min((TC_this['min_lat'][tt], OBJ['min_lat']))
+                TC_this['max_lon'][tt] = max((TC_this['max_lon'][tt], OBJ['max_lon']))
+                TC_this['max_lat'][tt] = max((TC_this['max_lat'][tt], OBJ['max_lat']))
+
+                TC_this['mean_inst'][tt] = OBJ['mean_inst_rainrate'] * OBJ['area']
+                TC_this['mean_accum'][tt] = OBJ['mean_running_rainrate'] * OBJ['area']
+                TC_this['max_inst'][tt] = max((TC_this['max_inst'][tt], OBJ['max_inst_rainrate']))
+                TC_this['max_accum'][tt] = max((TC_this['max_accum'][tt], OBJ['max_running_rainrate']))
+
             TC_this['centroid_lon'][tt] /= TC_this['area'][tt]
             TC_this['centroid_lat'][tt] /= TC_this['area'][tt]
+
+            TC_this['mean_inst'][tt] /= TC_this['area'][tt]
+            TC_this['mean_accum'][tt] /= TC_this['area'][tt]
+
+
+        ## Least squares linear fit for propagation speed.
+        Pzonal = np.polyfit(TC_this['timestamp'],TC_this['centroid_lon'],1)
+        TC_this['zonal_propagation_speed'] = Pzonal[0] * 111000.0  # deg / s --> m / s
+
+        Pmeridional = np.polyfit(TC_this['timestamp'],TC_this['centroid_lat'],1)
+        TC_this['meridional_propagation_speed'] = Pmeridional[0] * 111000.0  # deg / s --> m / s
+
+
 
         TC_all.append(TC_this)
 

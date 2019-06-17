@@ -176,38 +176,38 @@ def lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,merge_s
         lpt.lptio.lpt_system_tracks_output_netcdf(fn_tc_base + '.nc', TIMECLUSTERS)
 
 
-    """
-    LPT Plotting
-    """
+        """
+        LPT Plotting
+        """
 
-    if plotting['do_plotting']:
-        plt.figure(2)
-        fig2.clf()
-        ax2 = fig2.add_subplot(111)
+        if plotting['do_plotting']:
+            plt.figure(2)
+            fig2.clf()
+            ax2 = fig2.add_subplot(111)
 
-        timelon_rain = []
-        for this_dt in dt_list:
-            if 'sub_area' in dataset.keys():
-                DATA_RAW = dataset['read_function'](this_dt, verbose=dataset['verbose'], area=dataset['sub_area'])
-            else:
-                DATA_RAW = dataset['read_function'](this_dt, verbose=dataset['verbose'])
+            timelon_rain = []
+            for this_dt in dt_list:
+                if 'sub_area' in dataset.keys():
+                    DATA_RAW = dataset['read_function'](this_dt, verbose=dataset['verbose'], area=dataset['sub_area'])
+                else:
+                    DATA_RAW = dataset['read_function'](this_dt, verbose=dataset['verbose'])
 
-            lat_idx, = np.where(np.logical_and(DATA_RAW['lat'] > -15.0, DATA_RAW['lat'] < 15.0))
-            timelon_rain.append(np.mean(np.array(DATA_RAW['precip'][lat_idx,:]), axis=0))
+                lat_idx, = np.where(np.logical_and(DATA_RAW['lat'] > -15.0, DATA_RAW['lat'] < 15.0))
+                timelon_rain.append(np.mean(np.array(DATA_RAW['precip'][lat_idx,:]), axis=0))
 
 
-        lpt.plotting.plot_timelon_with_lpt(ax2, dt_list, DATA_RAW['lon']
-                , timelon_rain, TIMECLUSTERS, plotting['time_lon_range']
-                , accum_time_hours = lpo_options['accumulation_hours'])
+            lpt.plotting.plot_timelon_with_lpt(ax2, dt_list, DATA_RAW['lon']
+                    , timelon_rain, TIMECLUSTERS, plotting['time_lon_range']
+                    , accum_time_hours = lpo_options['accumulation_hours'])
 
-        ax2.set_title((dataset['label'].upper() + ' RT '
-                        + '15S-15N Rain Rate and LPTs\n' + str(lpt_options['lpt_history_days']) + ' Days Ending: ' + YMDH_fancy))
+            ax2.set_title((dataset['label'].upper() + ' RT '
+                            + '15S-15N Rain Rate and LPTs\n' + str(lpt_options['lpt_history_days']) + ' Days Ending: ' + YMDH_fancy))
 
-        img_dir2 = (output['img_dir'] + '/' + dataset['label'] + '/systems/'
-                        + end_of_accumulation_time.strftime(output['sub_directory_format']))
+            img_dir2 = (output['img_dir'] + '/' + dataset['label'] + '/systems/'
+                            + end_of_accumulation_time.strftime(output['sub_directory_format']))
 
-        os.makedirs(img_dir2, exist_ok = True)
-        file_out_base = (img_dir2 + '/lpt_time_lon_' + dataset['label'] + '_rt_' + YMDH
-                            + '__' + str(options['lpt_history_days']) + 'days')
-        lpt.plotting.print_and_save(file_out_base)
-        fig2.clf()
+            os.makedirs(img_dir2, exist_ok = True)
+            file_out_base = (img_dir2 + '/lpt_time_lon_' + dataset['label'] + '_rt_' + YMDH
+                                + '__' + str(options['lpt_history_days']) + 'days')
+            lpt.plotting.print_and_save(file_out_base)
+            fig2.clf()

@@ -4,6 +4,8 @@ import numpy.ma as ma
 from netCDF4 import Dataset
 import os
 import os.path
+import csv
+import datetime as dt
 
 ###################################################
 ### Output functions
@@ -39,14 +41,19 @@ def lp_objects_output_netcdf(fn, OBJ):
     print('Writing LP object NetCDF output to: ' + fn)
 
     DS = Dataset(fn, 'w', format='NETCDF4_CLASSIC', clobber=True)
-    DS.description = 'LP Objects NetCDF file.'
+    DS.description = ("LP Objects NetCDF file. nobj is the number of objects (each one has an objid), "
+        + "and npoints is the max pixels in any object. "
+        + "Parameters for the LP objects as a whole: centroid_lon, centroid_lat, and area. "
+        + "To see the pixels for each LP object, either use (pixels_x and pixels_y), "
+        + "or (grid_lon, grid_lat, grid_mask.). To plot the contour, best to use the grid_mask. "
+        + "The values in grid_mask are: -1 for no LPT, or the nnnn part of the LP object otherwise. "
+        + "NOTE: If no LP objects, nobj (npoints) dimension will be 0 (1).")
+    DS.N = len(OBJ['n_points'])
 
     ##
     ## Dimensions
     ##
-    DS.createDimension('nobj', len(OBJ['lon']))
-    max_points = np.max(OBJ['n_points'])
-    DS.createDimension('npoints', max_points)
+    DS.createDimension('nobj', 0)  # Unlimited demension.
 
     ## Grid stuff.
     DS.createDimension('grid_x', len(OBJ['grid']['lon']))
@@ -55,26 +62,67 @@ def lp_objects_output_netcdf(fn, OBJ):
     ##
     ## Variables
     ##
+
+    ## LP Object "bulk" properties.
+    var_objid = DS.createVariable('objid','d',('nobj',))
     var_centroid_lon = DS.createVariable('centroid_lon','f4',('nobj',))
     var_centroid_lat = DS.createVariable('centroid_lat','f4',('nobj',))
+    var_centroid_x = DS.createVariable('centroid_x','f4',('nobj',))
+    var_centroid_y = DS.createVariable('centroid_y','f4',('nobj',))
+    var_max_lon = DS.createVariable('max_lon','f4',('nobj',))
+    var_max_lat = DS.createVariable('max_lat','f4',('nobj',))
+    var_min_lon = DS.createVariable('min_lon','f4',('nobj',))
+    var_min_lat = DS.createVariable('min_lat','f4',('nobj',))
     var_area = DS.createVariable('area','f4',('nobj',))
-    var_objid = DS.createVariable('objid','d',('nobj',))
+    var_mean_inst_rainrate = DS.createVariable('mean_inst_rainrate','f4',('nobj',))
+    var_max_inst_rainrate = DS.createVariable('max_inst_rainrate','f4',('nobj',))
+    var_mean_acc_rainrate = DS.createVariable('mean_running_rainrate','f4',('nobj',))
+    var_max_acc_rainrate = DS.createVariable('max_running_rainrate','f4',('nobj',))
 
-    var_pixels_x = DS.createVariable('pixels_x','i4',('nobj','npoints',), zlib=True)
-    var_pixels_y = DS.createVariable('pixels_y','i4',('nobj','npoints',), zlib=True)
+    ## Pixels information.
+    if len(OBJ['n_points']) > 0:
 
+        max_points = np.max(OBJ['n_points'])
+        DS.createDimension('npoints', max_points)
+
+        var_pixels_x = DS.createVariable('pixels_x','i4',('nobj','npoints',), zlib=True)
+        var_pixels_y = DS.createVariable('pixels_y','i4',('nobj','npoints',), zlib=True)
+
+        ##
+        ## Values
+        ##
+        var_objid[:] = OBJ['id']
+        var_centroid_lon[:] = OBJ['lon']
+        var_centroid_lat[:] = OBJ['lat']
+        var_centroid_x[:] = OBJ['y']
+        var_centroid_y[:] = OBJ['x']
+        var_max_lon[:] = OBJ['max_lon']
+        var_max_lat[:] = OBJ['max_lat']
+        var_min_lon[:] = OBJ['min_lon']
+        var_min_lat[:] = OBJ['min_lat']
+        var_area[:] = OBJ['area']
+        var_mean_inst_rainrate[:] = OBJ['mean_inst']
+        var_max_inst_rainrate[:] = OBJ['max_inst']
+        var_mean_acc_rainrate[:] = OBJ['mean_accum']
+        var_max_acc_rainrate[:] = OBJ['max_accum']
+
+        for ii in range(len(OBJ['lon'])):
+            ypoints, xpoints = np.where(OBJ['label_im'] == ii+1)
+            var_pixels_x[ii,:len(xpoints)] = xpoints
+            var_pixels_y[ii,:len(ypoints)] = ypoints
+
+    else:
+        ## If there are no LP Objects, keep it as "missing values".
+        DS.createDimension('npoints', 1)
+        var_pixels_x = DS.createVariable('pixels_x','i4',('nobj','npoints',), zlib=True)
+        var_pixels_y = DS.createVariable('pixels_y','i4',('nobj','npoints',), zlib=True)
+
+
+    ## Grid variables.
     var_grid_lon = DS.createVariable('grid_lon','f4',('grid_x',))
     var_grid_lat = DS.createVariable('grid_lat','f4',('grid_y',))
     var_grid_area = DS.createVariable('grid_area','f4',('grid_y','grid_x',), zlib=True)
-    var_grid_mask = DS.createVariable('grid_mask','i4',('grid_y','grid_x',), zlib=True)
-
-    ##
-    ## Values
-    ##
-    var_centroid_lon[:] = OBJ['lon']
-    var_centroid_lat[:] = OBJ['lat']
-    var_area[:] = OBJ['area']
-    var_objid[:] = OBJ['id']
+    var_grid_mask = DS.createVariable('grid_mask','i4',('grid_y','grid_x',), zlib=True, fill_value=-1)
 
     var_grid_lon[:] = OBJ['grid']['lon']
     var_grid_lat[:] = OBJ['grid']['lat']
@@ -83,27 +131,33 @@ def lp_objects_output_netcdf(fn, OBJ):
     mask = ma.masked_array(mask, mask = (mask < -0.5))
     var_grid_mask[:] = mask
 
-    for ii in range(len(OBJ['lon'])):
-        ypoints, xpoints = np.where(OBJ['label_im'] == ii+1)
-        var_pixels_x[ii,:len(xpoints)] = xpoints
-        var_pixels_y[ii,:len(ypoints)] = ypoints
 
     ##
     ## Attributes/Metadata
     ##
-    var_centroid_lon.setncatts({'units':'degrees_east','long_name':'centroid longitude (0-360)','standard_name':'longitude','axis':'X'})
-    var_centroid_lat.setncatts({'units':'degrees_north','long_name':'centroid latitude (-90-90)','standard_name':'latitude','axis':'Y'})
-    var_area.setncatts({'units':'km2','long_name':'LP object enclosed area'})
     var_objid.setncatts({'units':'0','long_name':'LP Object ID'
-        ,'description':'A unique ID for each LP object. Convention is YYYYMMDDHHnnnn where nnnn starts at 0000'})
+        ,'description':'A unique ID for each LP object. Convention is YYYYMMDDHHnnnn where nnnn starts at 0000.'})
 
-    var_grid_lon.setncatts({'units':'degrees_east','long_name':'grid longitude (0-360)'})
-    var_grid_lat.setncatts({'units':'degrees_north','long_name':'grid latitude (-90-90)'})
+    var_centroid_lon.setncatts({'units':'degrees_east','long_name':'centroid longitude (0-360)'})
+    var_centroid_lat.setncatts({'units':'degrees_north','long_name':'centroid latitude (-90-90)'})
+    var_centroid_x.setncatts({'units':'1.0','long_name':'centroid x grid point (0 to NX-1)'})
+    var_centroid_y.setncatts({'units':'1.0','long_name':'centroid y grid point (0 to NY-1)'})
+    var_max_lon.setncatts({'units':'degrees_east','long_name':'max (eastmost) longitude (0-360)'})
+    var_max_lat.setncatts({'units':'degrees_north','long_name':'max (northmost) latitude (-90-90)'})
+    var_min_lon.setncatts({'units':'degrees_east','long_name':'min (westmost) longitude (0-360)'})
+    var_min_lat.setncatts({'units':'degrees_north','long_name':'min (southmost) latitude (-90-90)'})
+    var_area.setncatts({'units':'km2','long_name':'LP object enclosed area'})
+    var_mean_inst_rainrate.setncatts({'units':'mm h-1','long_name':'LP object mean instantaneous rain rate (at end of accum time).'})
+    var_max_inst_rainrate.setncatts({'units':'mm h-1','long_name':'LP object max instantaneous rain rate (at end of accum time).'})
+    var_mean_acc_rainrate.setncatts({'units':'mm day-1','long_name':'LP object running mean rain rate (at end of accum time).'})
+    var_max_acc_rainrate.setncatts({'units':'mm day-1','long_name':'LP object running mean rain rate (at end of accum time).'})
+
+    var_grid_lon.setncatts({'units':'degrees_east','long_name':'grid longitude (0-360)','standard_name':'longitude','axis':'X'})
+    var_grid_lat.setncatts({'units':'degrees_north','long_name':'grid latitude (-90-90)','standard_name':'latitude','axis':'Y'})
     var_grid_area.setncatts({'units':'km2','long_name':'area of each grid point'})
-    var_grid_area.setncatts({'units':'0','long_name':'mask by nnnn part of LP Object ID'})
-
-    var_pixels_x.setncatts({'units':'0','long_name':'grid point pixel indices in the x direction','note':'zero based'})
-    var_pixels_y.setncatts({'units':'0','long_name':'grid point pixel indices in the y direction','note':'zero based'})
+    var_grid_mask.setncatts({'units':'0','long_name':'mask by nnnn part of LP Object ID.', 'note':'-1 for no LP Object.'})
+    var_pixels_x.setncatts({'units':'0','long_name':'grid point pixel indices in the x direction','note':'zero based (Python convention)'})
+    var_pixels_y.setncatts({'units':'0','long_name':'grid point pixel indices in the y direction','note':'zero based (Python convention)'})
 
     DS.close()
 
@@ -111,7 +165,7 @@ def lp_objects_output_netcdf(fn, OBJ):
 def lpt_system_tracks_output_ascii(fn, TIMECLUSTERS):
     """
     This function outputs the "bulk" LPT system properties (centroid, date, area)
-    to an ascii file.
+    to an ascii file. Does NOT give LPO list.
     """
     print('Writing LPT system track ASCII output to: ' + fn)
     fmt='        %4d%02d%02d%02d %8d %10.2f %10.2f %2d\n'
@@ -138,10 +192,17 @@ def lpt_system_tracks_output_ascii(fn, TIMECLUSTERS):
     file.close()
 
 
+def lpt_systems_group_array_output_ascii(fn, LPT):
+
+    print('Writing LPT system group info (including LP object IDs) to: ' + fn)
+    header='time_stamp__._, YYYYMMDDHHnnnn, lpt_sys_id, B, E, S, branches'
+    np.savetxt(fn, LPT, fmt='  %14.1f, %14d, %10f, %d, %d, %d, %d', header=header)
+
+
 def lpt_system_tracks_output_netcdf(fn, TIMECLUSTERS):
     """
     This function outputs the "bulk" LPT system properties (centroid, date, area)
-    plus the LP Objects belonging to each "TIMECLUSTER" to an ascii file.
+    plus the LP Objects belonging to each "TIMECLUSTER" to a netcdf file.
     """
     print('Writing LPT system track NetCDF output to: ' + fn)
 
@@ -158,51 +219,131 @@ def lpt_system_tracks_output_netcdf(fn, TIMECLUSTERS):
     DS.createDimension('nlpt', len(TIMECLUSTERS))
     max_points = 1
     max_times = 1
+    lptid_collect = np.array([MISSING])
     timestamp_collect = np.array([MISSING])
     centroid_lon_collect = np.array([MISSING])
-    max_lon_collect = np.array([MISSING])
     centroid_lat_collect = np.array([MISSING])
+    max_lon_collect = np.array([MISSING])
+    min_lon_collect = np.array([MISSING])
+    max_lat_collect = np.array([MISSING])
+    min_lat_collect = np.array([MISSING])
     area_collect = np.array([MISSING])
+    mean_inst_collect = np.array([MISSING])
+    max_inst_collect = np.array([MISSING])
+    mean_accum_collect = np.array([MISSING])
+    max_accum_collect = np.array([MISSING])
+
+    lpt_begin_index = []
+    lpt_end_index = []
+    time_step_hours = 999
     for ii in range(len(TIMECLUSTERS)):
+
         max_points = max(max_points, len(TIMECLUSTERS[ii]['objid']))
         max_times = max(max_times, len(TIMECLUSTERS[ii]['datetime']))
+
+        lpt_begin_index += [len(lptid_collect)] # zero based, so next index is the length.
+
+        lptid_collect = np.append(np.append(lptid_collect, np.ones(len(TIMECLUSTERS[ii]['timestamp']))*TIMECLUSTERS[ii]['lpt_id']),MISSING)
         timestamp_collect = np.append(np.append(timestamp_collect, TIMECLUSTERS[ii]['timestamp']/3600.0),MISSING)
         centroid_lon_collect = np.append(np.append(centroid_lon_collect, TIMECLUSTERS[ii]['centroid_lon']),MISSING)
-        max_lon_collect = np.append(np.append(max_lon_collect, TIMECLUSTERS[ii]['max_lon']),MISSING)
         centroid_lat_collect = np.append(np.append(centroid_lat_collect, TIMECLUSTERS[ii]['centroid_lat']),MISSING)
         area_collect = np.append(np.append(area_collect, TIMECLUSTERS[ii]['area']),MISSING)
+        max_lon_collect = np.append(np.append(max_lon_collect, TIMECLUSTERS[ii]['max_lon']),MISSING)
+        max_lat_collect = np.append(np.append(max_lat_collect, TIMECLUSTERS[ii]['max_lat']),MISSING)
+        min_lon_collect = np.append(np.append(min_lon_collect, TIMECLUSTERS[ii]['min_lon']),MISSING)
+        min_lat_collect = np.append(np.append(min_lat_collect, TIMECLUSTERS[ii]['min_lat']),MISSING)
 
-    DS.createDimension('nobj', max_points)
-    DS.createDimension('ntimes', max_times)
+        mean_inst_collect = np.append(np.append(mean_inst_collect, TIMECLUSTERS[ii]['mean_inst']),MISSING)
+        max_inst_collect = np.append(np.append(max_inst_collect, TIMECLUSTERS[ii]['max_inst']),MISSING)
+        mean_accum_collect = np.append(np.append(mean_accum_collect, TIMECLUSTERS[ii]['mean_accum']),MISSING)
+        max_accum_collect = np.append(np.append(max_accum_collect, TIMECLUSTERS[ii]['max_accum']),MISSING)
+
+        lpt_end_index += [len(lptid_collect)-2] # zero based, and I added a NaN, so end index is the length.
+
+
     DS.createDimension('nall', len(timestamp_collect))
 
     ##
     ## Variables
     ##
 
+    ## Single value "bulk" variables.
+    DS.createVariable('lptid', 'f4', ('nlpt',))
+    DS.createVariable('lpt_begin_index', 'i', ('nlpt',))
+    DS.createVariable('lpt_end_index', 'i', ('nlpt',))
+    DS.createVariable('duration', 'f4', ('nlpt',))
+    DS.createVariable('maxarea', 'd', ('nlpt',))
+    DS.createVariable('zonal_propagation_speed','f4',('nlpt',))
+    DS.createVariable('meridional_propagation_speed','f4',('nlpt',))
+
     ## Stitchec "bulk" variables.
+    var_timestamp_all = DS.createVariable('timestamp_stitched','d',('nall',))
+    var_lptid_all = DS.createVariable('lptid_stitched','f4',('nall',))
     var_centroid_lon_all = DS.createVariable('centroid_lon_stitched','f4',('nall',))
-    #var_max_lon_all = DS.createVariable('max_lon_stitched','f4',('nall',))
     var_centroid_lat_all = DS.createVariable('centroid_lat_stitched','f4',('nall',))
     var_area_all = DS.createVariable('area_stitched','d',('nall',))
-    var_timestamp_all = DS.createVariable('timestamp_stitched','d',('nall',))
+    var_max_lon_all = DS.createVariable('max_lon_stitched','f4',('nall',))
+    var_max_lat_all = DS.createVariable('max_lat_stitched','f4',('nall',))
+    var_min_lon_all = DS.createVariable('min_lon_stitched','f4',('nall',))
+    var_min_lat_all = DS.createVariable('min_lat_stitched','f4',('nall',))
+    DS.createVariable('mean_inst_rain_rate', 'd', ('nall',))
+    DS.createVariable('max_inst_rain_rate', 'd', ('nall',))
+    DS.createVariable('mean_running_rain_rate', 'd', ('nall',))
+    DS.createVariable('max_running_rain_rate', 'd', ('nall',))
+
 
     ##
     ## Values
     ##
+    DS['lptid'][:] = [TIMECLUSTERS[ii]['lpt_id'] for ii in range(len(TIMECLUSTERS))]
+    DS['lpt_begin_index'][:] = lpt_begin_index
+    DS['lpt_end_index'][:] = lpt_end_index
+    DS['duration'][:] = [(TIMECLUSTERS[ii]['datetime'][-1] - TIMECLUSTERS[ii]['datetime'][0]).total_seconds()/3600.0 for ii in range(len(TIMECLUSTERS))]
+    DS['maxarea'][:] = [np.max(TIMECLUSTERS[ii]['area']) for ii in range(len(TIMECLUSTERS))]
+    DS['zonal_propagation_speed'][:] = [TIMECLUSTERS[ii]['zonal_propagation_speed'] for ii in range(len(TIMECLUSTERS))]
+    DS['meridional_propagation_speed'][:] = [TIMECLUSTERS[ii]['meridional_propagation_speed'] for ii in range(len(TIMECLUSTERS))]
+
+
+    var_timestamp_all[:] = timestamp_collect
+    var_lptid_all[:] = lptid_collect
     var_centroid_lon_all[:] = centroid_lon_collect
-    #var_max_lon_all[:] = max_lon_collect
     var_centroid_lat_all[:] = centroid_lat_collect
     var_area_all[:] = area_collect
-    var_timestamp_all[:] = timestamp_collect
+    var_max_lon_all[:] = max_lon_collect
+    var_max_lat_all[:] = max_lat_collect
+    var_min_lon_all[:] = min_lon_collect
+    var_min_lat_all[:] = min_lat_collect
+
+    DS['mean_inst_rain_rate'][:] = mean_inst_collect
+    DS['max_inst_rain_rate'][:] = max_inst_collect
+    DS['mean_running_rain_rate'][:] = mean_accum_collect
+    DS['max_running_rain_rate'][:] = max_accum_collect
+
 
     ##
     ## Attributes/Metadata
     ##
+    DS['lptid'].setncatts({'units':'1.0','long_name':'LPT System id'})
+    DS['lpt_begin_index'].setncatts({'units':'1','long_name':'LPT System beginning index (zero-based, Python convention)'})
+    DS['lpt_end_index'].setncatts({'units':'1','long_name':'LPT System beginning index (zero-based, Python convention)'})
+    DS['duration'].setncatts({'units':'h','long_name':'LPT System Duration'})
+    DS['maxarea'].setncatts({'units':'km2','long_name':'LPT System area at time of largest extent'})
+    DS['zonal_propagation_speed'].setncatts({'units':'m s-1','long_name':'Centroid Zonal Propagation Speed from least squares regression.'})
+    DS['meridional_propagation_speed'].setncatts({'units':'m s-1','long_name':'Centroid Meridional Propagation Speed from least squares regression.'})
+    var_timestamp_all.setncatts({'units':'hours since 1970-1-1 0:0','long_name':'LPT System time stamp -- stitched'})
+    var_lptid_all.setncatts({'units':'1.0','long_name':'LPT System id -- stitched'})
     var_centroid_lon_all.setncatts({'units':'degrees_east','long_name':'centroid longitude (0-360) -- stitched','standard_name':'longitude'})
-    #var_max_lon_all.setncatts({'units':'degrees_east','long_name':'eastmost longitude (0-360) -- stitched','standard_name':'longitude'})
     var_centroid_lat_all.setncatts({'units':'degrees_north','long_name':'centroid latitude (-90-90) -- stitched','standard_name':'latitude'})
     var_area_all.setncatts({'units':'km2','long_name':'LPT System enclosed area -- stitched'})
-    var_timestamp_all.setncatts({'units':'hours since 1970-1-1 0:0','long_name':'LPT System time stamp -- stitched'})
+    var_max_lon_all.setncatts({'units':'degrees_east','long_name':'max (eastmost) longitude (0-360) -- stitched','standard_name':'longitude'})
+    var_max_lat_all.setncatts({'units':'degrees_north','long_name':'max (northmost) latitude (-90-90) -- stitched','standard_name':'longitude'})
+    var_min_lon_all.setncatts({'units':'degrees_east','long_name':'min (westmost) longitude (0-360) -- stitched','standard_name':'longitude'})
+    var_min_lat_all.setncatts({'units':'degrees_north','long_name':'min (southmost) latitude (-90-90) -- stitched','standard_name':'longitude'})
+
+    DS['mean_inst_rain_rate'].setncatts({'units':'mm h-1','long_name':'LP object mean instantaneous rain rate (at end of accum time).'})
+    DS['max_inst_rain_rate'].setncatts({'units':'mm h-1','long_name':'LP object max instantaneous rain rate (at end of accum time).'})
+    DS['mean_running_rain_rate'].setncatts({'units':'mm day-1','long_name':'LP object running mean rain rate (at end of accum time).'})
+    DS['max_running_rain_rate'].setncatts({'units':'mm day-1','long_name':'LP object running mean rain rate (at end of accum time).'})
+
 
     DS.close()
