@@ -208,11 +208,11 @@ def lpt_system_tracks_output_netcdf(fn, TIMECLUSTERS):
 
     os.makedirs(os.path.dirname(fn), exist_ok=True) # Make directory if needed.
 
-    DS = Dataset(fn, 'w', format='NETCDF4_CLASSIC', clobber=True)
+    DS = Dataset(fn, 'w', format='NETCDF4', clobber=True)
     DS.description = 'LPT Systems "timeclusters" NetCDF file.'
 
-    MISSING = np.nan
-    FILL_VALUE = -990.0
+    MISSING = -999.0
+    FILL_VALUE = MISSING
     ##
     ## Dimensions
     ##
@@ -220,7 +220,7 @@ def lpt_system_tracks_output_netcdf(fn, TIMECLUSTERS):
     max_points = 1
     max_times = 1
     lptid_collect = np.array([MISSING])
-    timestamp_collect = np.array([MISSING])
+    timestamp_collect = np.double([MISSING])
     centroid_lon_collect = np.array([MISSING])
     centroid_lat_collect = np.array([MISSING])
     max_lon_collect = np.array([MISSING])
@@ -243,8 +243,9 @@ def lpt_system_tracks_output_netcdf(fn, TIMECLUSTERS):
 
         lpt_begin_index += [len(lptid_collect)] # zero based, so next index is the length.
 
-        lptid_collect = np.append(np.append(lptid_collect, np.ones(len(TIMECLUSTERS[ii]['timestamp']))*TIMECLUSTERS[ii]['lpt_id']),MISSING)
-        timestamp_collect = np.append(np.append(timestamp_collect, TIMECLUSTERS[ii]['timestamp']/3600.0),MISSING)
+        lptid_collect = np.append(np.append(lptid_collect, np.ones(len(TIMECLUSTERS[ii]['datetime']))*TIMECLUSTERS[ii]['lpt_id']),MISSING)
+        this_timestamp = [(TIMECLUSTERS[ii]['datetime'][x] - dt.datetime(1970,1,1,0,0,0)).total_seconds()/3600.0 for x in range(len(TIMECLUSTERS[ii]['datetime']))]
+        timestamp_collect = np.append(np.append(timestamp_collect, this_timestamp), MISSING)
         centroid_lon_collect = np.append(np.append(centroid_lon_collect, TIMECLUSTERS[ii]['centroid_lon']),MISSING)
         centroid_lat_collect = np.append(np.append(centroid_lat_collect, TIMECLUSTERS[ii]['centroid_lat']),MISSING)
         area_collect = np.append(np.append(area_collect, TIMECLUSTERS[ii]['area']),MISSING)
@@ -261,6 +262,8 @@ def lpt_system_tracks_output_netcdf(fn, TIMECLUSTERS):
         lpt_end_index += [len(lptid_collect)-2] # zero based, and I added a NaN, so end index is the length.
 
 
+    print(timestamp_collect[0:4],flush=True)
+
     DS.createDimension('nall', len(timestamp_collect))
 
     ##
@@ -268,28 +271,28 @@ def lpt_system_tracks_output_netcdf(fn, TIMECLUSTERS):
     ##
 
     ## Single value "bulk" variables.
-    DS.createVariable('lptid', 'f4', ('nlpt',))
-    DS.createVariable('lpt_begin_index', 'i', ('nlpt',))
-    DS.createVariable('lpt_end_index', 'i', ('nlpt',))
-    DS.createVariable('duration', 'f4', ('nlpt',))
-    DS.createVariable('maxarea', 'd', ('nlpt',))
-    DS.createVariable('zonal_propagation_speed','f4',('nlpt',))
-    DS.createVariable('meridional_propagation_speed','f4',('nlpt',))
+    DS.createVariable('lptid', 'f4', ('nlpt',),fill_value=FILL_VALUE)
+    DS.createVariable('lpt_begin_index', 'i', ('nlpt',),fill_value=FILL_VALUE)
+    DS.createVariable('lpt_end_index', 'i', ('nlpt',),fill_value=FILL_VALUE)
+    DS.createVariable('duration', 'f4', ('nlpt',),fill_value=FILL_VALUE)
+    DS.createVariable('maxarea', 'd', ('nlpt',),fill_value=FILL_VALUE)
+    DS.createVariable('zonal_propagation_speed','f4',('nlpt',),fill_value=FILL_VALUE)
+    DS.createVariable('meridional_propagation_speed','f4',('nlpt',),fill_value=FILL_VALUE)
 
     ## Stitchec "bulk" variables.
-    var_timestamp_all = DS.createVariable('timestamp_stitched','d',('nall',))
-    var_lptid_all = DS.createVariable('lptid_stitched','f4',('nall',))
-    var_centroid_lon_all = DS.createVariable('centroid_lon_stitched','f4',('nall',))
-    var_centroid_lat_all = DS.createVariable('centroid_lat_stitched','f4',('nall',))
-    var_area_all = DS.createVariable('area_stitched','d',('nall',))
-    var_max_lon_all = DS.createVariable('max_lon_stitched','f4',('nall',))
-    var_max_lat_all = DS.createVariable('max_lat_stitched','f4',('nall',))
-    var_min_lon_all = DS.createVariable('min_lon_stitched','f4',('nall',))
-    var_min_lat_all = DS.createVariable('min_lat_stitched','f4',('nall',))
-    DS.createVariable('mean_inst_rain_rate', 'd', ('nall',))
-    DS.createVariable('max_inst_rain_rate', 'd', ('nall',))
-    DS.createVariable('mean_running_rain_rate', 'd', ('nall',))
-    DS.createVariable('max_running_rain_rate', 'd', ('nall',))
+    var_timestamp_all = DS.createVariable('timestamp_stitched','u4',('nall',),fill_value=int(FILL_VALUE))
+    var_lptid_all = DS.createVariable('lptid_stitched','f4',('nall',),fill_value=FILL_VALUE)
+    var_centroid_lon_all = DS.createVariable('centroid_lon_stitched','f4',('nall',),fill_value=FILL_VALUE)
+    var_centroid_lat_all = DS.createVariable('centroid_lat_stitched','f4',('nall',),fill_value=FILL_VALUE)
+    var_area_all = DS.createVariable('area_stitched','d',('nall',),fill_value=FILL_VALUE)
+    var_max_lon_all = DS.createVariable('max_lon_stitched','f4',('nall',),fill_value=FILL_VALUE)
+    var_max_lat_all = DS.createVariable('max_lat_stitched','f4',('nall',),fill_value=FILL_VALUE)
+    var_min_lon_all = DS.createVariable('min_lon_stitched','f4',('nall',),fill_value=FILL_VALUE)
+    var_min_lat_all = DS.createVariable('min_lat_stitched','f4',('nall',),fill_value=FILL_VALUE)
+    DS.createVariable('mean_inst_rain_rate', 'f4', ('nall',),fill_value=FILL_VALUE)
+    DS.createVariable('max_inst_rain_rate', 'f4', ('nall',),fill_value=FILL_VALUE)
+    DS.createVariable('mean_running_rain_rate', 'f4', ('nall',),fill_value=FILL_VALUE)
+    DS.createVariable('max_running_rain_rate', 'f4', ('nall',),fill_value=FILL_VALUE)
 
 
     ##
@@ -303,7 +306,7 @@ def lpt_system_tracks_output_netcdf(fn, TIMECLUSTERS):
     DS['zonal_propagation_speed'][:] = [TIMECLUSTERS[ii]['zonal_propagation_speed'] for ii in range(len(TIMECLUSTERS))]
     DS['meridional_propagation_speed'][:] = [TIMECLUSTERS[ii]['meridional_propagation_speed'] for ii in range(len(TIMECLUSTERS))]
 
-
+    print(timestamp_collect[0:4])
     var_timestamp_all[:] = timestamp_collect
     var_lptid_all[:] = lptid_collect
     var_centroid_lon_all[:] = centroid_lon_collect
