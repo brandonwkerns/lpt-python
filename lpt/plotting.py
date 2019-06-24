@@ -54,14 +54,17 @@ def plot_map_background(plotArea=[0,360,-60,60], lon_labels = [1,0,0,0], lat_lab
                   llcrnrlat = plotArea[2],
                   urcrnrlat = plotArea[3],
                   llcrnrlon = plotArea[0],
-                  urcrnrlon = plotArea[1]);
+                  urcrnrlon = plotArea[1])
 
     #map.fillcontinents(color='lightgray', lake_color='lightgray')
-    map.drawcoastlines(linewidth=0.5, color=coast_color) ;
-    map.drawparallels(np.arange(-80,81,20), linewidth=0.5, labels = lon_labels, fontsize = fontsize);
-    map.drawmeridians(np.arange(0,361,20), linewidth=0.5, labels = lat_labels, fontsize = fontsize);
+    map.drawcoastlines(linewidth=0.5, color=coast_color)
+    map.drawparallels(np.arange(-80,81,20), linewidth=0.5, labels = lon_labels, fontsize = fontsize)
+    if plotArea[1] - plotArea[0] < 180.1:
+        map.drawmeridians(np.arange(0,361,20), linewidth=0.5, labels = lat_labels, fontsize = fontsize)
+    else:
+        map.drawmeridians(np.arange(0,361,40), linewidth=0.5, labels = lat_labels, fontsize = fontsize)
 
-    return map ;
+    return map
 
 
 def print_and_save(file_out_base):

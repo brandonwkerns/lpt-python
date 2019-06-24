@@ -86,7 +86,7 @@ def calc_grid_cell_area(lon, lat):
 
 
 
-def calculate_lp_object_properties(lon, lat, field, field_accum, label_im
+def calculate_lp_object_properties(lon, lat, field, field_running, field_filtered, label_im
                         , object_minimum_gridpoints, end_of_accumulation_time
                         , verbose=False):
 
@@ -108,10 +108,17 @@ def calculate_lp_object_properties(lon, lat, field, field_accum, label_im
     area2d = calc_grid_cell_area(lon2, lat2)
 
     sizes = ndimage.sum(mask, label_im, range(1, nb_labels + 1))
-    mean_instantaneous_rain_rate = ndimage.mean(field, label_im, range(1, nb_labels + 1))
-    mean_accum_rain_rate = ndimage.mean(field_accum, label_im, range(1, nb_labels + 1))
-    max_instantaneous_rain_rate = ndimage.maximum(field, label_im, range(1, nb_labels + 1))
-    max_accum_rain_rate = ndimage.maximum(field_accum, label_im, range(1, nb_labels + 1))
+
+    amean_instantaneous_field = ndimage.mean(field, label_im, range(1, nb_labels + 1))
+    amean_running_field = ndimage.mean(field_running, label_im, range(1, nb_labels + 1))
+    amean_filtered_running_field = ndimage.mean(field_filtered, label_im, range(1, nb_labels + 1))
+    min_instantaneous_field = ndimage.minimum(field, label_im, range(1, nb_labels + 1))
+    min_running_field = ndimage.minimum(field_running, label_im, range(1, nb_labels + 1))
+    min_filtered_running_field = ndimage.minimum(field_filtered, label_im, range(1, nb_labels + 1))
+    max_instantaneous_field = ndimage.maximum(field, label_im, range(1, nb_labels + 1))
+    max_running_field = ndimage.maximum(field_running, label_im, range(1, nb_labels + 1))
+    max_filtered_running_field = ndimage.maximum(field_filtered, label_im, range(1, nb_labels + 1))
+
     centroid_lon = ndimage.mean(lon2, label_im, range(1, nb_labels + 1))
     centroid_lat = ndimage.mean(lat2, label_im, range(1, nb_labels + 1))
     centroid_x = ndimage.mean(X2, label_im, range(1, nb_labels + 1))
@@ -142,10 +149,16 @@ def calculate_lp_object_properties(lon, lat, field, field_accum, label_im
     OBJ['y'] = centroid_y
     OBJ['n_points'] = sizes
     OBJ['area'] = area
-    OBJ['mean_inst'] = mean_instantaneous_rain_rate
-    OBJ['mean_accum'] = mean_accum_rain_rate
-    OBJ['max_inst'] = max_instantaneous_rain_rate
-    OBJ['max_accum'] = max_accum_rain_rate
+
+    OBJ['amean_inst_field'] = amean_instantaneous_field
+    OBJ['amean_running_field'] = amean_running_field
+    OBJ['amean_filtered_running_field'] = amean_filtered_running_field
+    OBJ['min_inst_field'] = min_instantaneous_field
+    OBJ['min_running_field'] = min_running_field
+    OBJ['min_filtered_running_field'] = min_filtered_running_field
+    OBJ['max_inst_field'] = max_instantaneous_field
+    OBJ['max_running_field'] = max_running_field
+    OBJ['max_filtered_running_field'] = max_filtered_running_field
 
     # Grid stuff.
     OBJ['grid'] = {}
@@ -845,10 +858,15 @@ def calc_lpt_system_group_properties(LPT, options, fmt="/%Y/%m/%Y%m%d/objects_%Y
         TC_this['min_lat'] =  999.0 * np.ones(len(TC_this['timestamp']))
         TC_this['max_lat'] = -999.0 * np.ones(len(TC_this['timestamp']))
 
-        TC_this['mean_inst'] = np.zeros(len(TC_this['timestamp']))
-        TC_this['max_inst'] = -999.0 * np.ones(len(TC_this['timestamp']))
-        TC_this['mean_accum'] = np.zeros(len(TC_this['timestamp']))
-        TC_this['max_accum'] = -999.0 * np.ones(len(TC_this['timestamp']))
+        TC_this['amean_inst_field'] = np.zeros(len(TC_this['timestamp']))
+        TC_this['amean_running_field'] = np.zeros(len(TC_this['timestamp']))
+        TC_this['amean_filtered_running_field'] = np.zeros(len(TC_this['timestamp']))
+        TC_this['min_inst_field'] = 999.0 * np.ones(len(TC_this['timestamp']))
+        TC_this['min_running_field'] = 999.0 * np.ones(len(TC_this['timestamp']))
+        TC_this['min_filtered_running_field'] = 999.0 * np.ones(len(TC_this['timestamp']))
+        TC_this['max_inst_field'] = -999.0 * np.ones(len(TC_this['timestamp']))
+        TC_this['max_running_field'] = -999.0 * np.ones(len(TC_this['timestamp']))
+        TC_this['max_filtered_running_field'] = -999.0 * np.ones(len(TC_this['timestamp']))
 
 
         ## Loop over unique time stamps.
@@ -862,7 +880,9 @@ def calc_lpt_system_group_properties(LPT, options, fmt="/%Y/%m/%Y%m%d/objects_%Y
                 OBJ = read_lp_object_properties(this_objid, options['objdir']
                     , ['centroid_lon','centroid_lat','area','pixels_x','pixels_y'
                         ,'min_lon','max_lon','min_lat','max_lat'
-                        ,'mean_inst_rainrate','mean_running_rainrate','max_inst_rainrate','max_running_rainrate'], fmt=fmt)
+                        ,'amean_inst_field','amean_running_field','max_inst_field','max_running_field'
+                        ,'min_inst_field','min_running_field','min_filtered_running_field'
+                        ,'amean_filtered_running_field','max_filtered_running_field'], fmt=fmt)
 
                 TC_this['nobj'][tt] += 1
                 TC_this['area'][tt] += OBJ['area']
@@ -874,17 +894,22 @@ def calc_lpt_system_group_properties(LPT, options, fmt="/%Y/%m/%Y%m%d/objects_%Y
                 TC_this['max_lon'][tt] = max((TC_this['max_lon'][tt], OBJ['max_lon']))
                 TC_this['max_lat'][tt] = max((TC_this['max_lat'][tt], OBJ['max_lat']))
 
-                TC_this['mean_inst'][tt] = OBJ['mean_inst_rainrate'] * OBJ['area']
-                TC_this['mean_accum'][tt] = OBJ['mean_running_rainrate'] * OBJ['area']
-                TC_this['max_inst'][tt] = max((TC_this['max_inst'][tt], OBJ['max_inst_rainrate']))
-                TC_this['max_accum'][tt] = max((TC_this['max_accum'][tt], OBJ['max_running_rainrate']))
+                TC_this['amean_inst_field'][tt] += OBJ['amean_inst_field'] * OBJ['area']
+                TC_this['amean_running_field'][tt] += OBJ['amean_running_field'] * OBJ['area']
+                TC_this['amean_filtered_running_field'][tt] += OBJ['amean_filtered_running_field'] * OBJ['area']
+                TC_this['min_inst_field'][tt] = min((TC_this['min_inst_field'][tt], OBJ['min_inst_field']))
+                TC_this['min_running_field'][tt] = min((TC_this['min_running_field'][tt], OBJ['min_running_field']))
+                TC_this['min_filtered_running_field'][tt] = min((TC_this['min_filtered_running_field'][tt], OBJ['min_filtered_running_field']))
+                TC_this['max_inst_field'][tt] = max((TC_this['max_inst_field'][tt], OBJ['max_inst_field']))
+                TC_this['max_running_field'][tt] = max((TC_this['max_running_field'][tt], OBJ['max_running_field']))
+                TC_this['max_filtered_running_field'][tt] = max((TC_this['max_filtered_running_field'][tt], OBJ['max_filtered_running_field']))
 
             TC_this['centroid_lon'][tt] /= TC_this['area'][tt]
             TC_this['centroid_lat'][tt] /= TC_this['area'][tt]
 
-            TC_this['mean_inst'][tt] /= TC_this['area'][tt]
-            TC_this['mean_accum'][tt] /= TC_this['area'][tt]
-
+            TC_this['amean_inst_field'][tt] /= TC_this['area'][tt]
+            TC_this['amean_running_field'][tt] /= TC_this['area'][tt]
+            TC_this['amean_filtered_running_field'][tt] /= TC_this['area'][tt]
 
         ## Least squares linear fit for propagation speed.
         Pzonal = np.polyfit(TC_this['timestamp'],TC_this['centroid_lon'],1)
@@ -892,8 +917,6 @@ def calc_lpt_system_group_properties(LPT, options, fmt="/%Y/%m/%Y%m%d/objects_%Y
 
         Pmeridional = np.polyfit(TC_this['timestamp'],TC_this['centroid_lat'],1)
         TC_this['meridional_propagation_speed'] = Pmeridional[0] * 111000.0  # deg / s --> m / s
-
-
 
         TC_all.append(TC_this)
 

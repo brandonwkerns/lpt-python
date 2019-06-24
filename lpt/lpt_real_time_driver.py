@@ -72,7 +72,7 @@ def lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,merge_s
             ## Get LP objects.
             label_im = lpt.helpers.identify_lp_objects(DATA_FILTERED, lpo_options['thresh'], verbose=dataset['verbose'])
             OBJ = lpt.helpers.calculate_lp_object_properties(DATA_RAW['lon'], DATA_RAW['lat']
-                        , DATA_RAW['precip'], DATA_ACCUM, label_im, 0
+                        , DATA_RAW['precip'], DATA_ACCUM, DATA_FILTERED, label_im, 0
                         , end_of_accumulation_time, verbose=True)
             print('objects properties.',flush=True)
 

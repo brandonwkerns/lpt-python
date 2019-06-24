@@ -38,10 +38,17 @@ def lp_objects_output_netcdf(fn, OBJ):
     This function outputs the "bulk" LP object properties (centroid, date, area)
     Plus the pixel information to a compressed netcdf file.
     """
+
+    if not 'units_inst' in OBJ:
+        print('WARNING: units_inst, units_running, and units_filtered not specified in dict OBJ. Netcdf file will have empty units.')
+        OBJ['units_inst'] = ''
+        OBJ['units_running'] = ''
+        OBJ['units_filtered'] = ''
+
     print('Writing LP object NetCDF output to: ' + fn)
 
     DS = Dataset(fn, 'w', format='NETCDF4_CLASSIC', clobber=True)
-    DS.description = ("LP Objects NetCDF file. nobj is the number of objects (each one has an objid), "
+    DS.description = ("LP Objects NetCDF file. Time stamp is for the END of running mean time. nobj is the number of objects (each one has an objid), "
         + "and npoints is the max pixels in any object. "
         + "Parameters for the LP objects as a whole: centroid_lon, centroid_lat, and area. "
         + "To see the pixels for each LP object, either use (pixels_x and pixels_y), "
@@ -74,10 +81,16 @@ def lp_objects_output_netcdf(fn, OBJ):
     var_min_lon = DS.createVariable('min_lon','f4',('nobj',))
     var_min_lat = DS.createVariable('min_lat','f4',('nobj',))
     var_area = DS.createVariable('area','f4',('nobj',))
-    var_mean_inst_rainrate = DS.createVariable('mean_inst_rainrate','f4',('nobj',))
-    var_max_inst_rainrate = DS.createVariable('max_inst_rainrate','f4',('nobj',))
-    var_mean_acc_rainrate = DS.createVariable('mean_running_rainrate','f4',('nobj',))
-    var_max_acc_rainrate = DS.createVariable('max_running_rainrate','f4',('nobj',))
+
+    var_amean_inst_field = DS.createVariable('amean_inst_field','f4',('nobj',))
+    var_amean_running_field = DS.createVariable('amean_running_field','f4',('nobj',))
+    var_amean_filtered_running_field = DS.createVariable('amean_filtered_running_field','f4',('nobj',))
+    var_min_inst_field = DS.createVariable('min_inst_field','f4',('nobj',))
+    var_min_running_field = DS.createVariable('min_running_field','f4',('nobj',))
+    var_min_filtered_running_field = DS.createVariable('min_filtered_running_field','f4',('nobj',))
+    var_max_inst_field = DS.createVariable('max_inst_field','f4',('nobj',))
+    var_max_running_field = DS.createVariable('max_running_field','f4',('nobj',))
+    var_max_filtered_running_field = DS.createVariable('max_filtered_running_field','f4',('nobj',))
 
     ## Pixels information.
     if len(OBJ['n_points']) > 0:
@@ -101,10 +114,16 @@ def lp_objects_output_netcdf(fn, OBJ):
         var_min_lon[:] = OBJ['min_lon']
         var_min_lat[:] = OBJ['min_lat']
         var_area[:] = OBJ['area']
-        var_mean_inst_rainrate[:] = OBJ['mean_inst']
-        var_max_inst_rainrate[:] = OBJ['max_inst']
-        var_mean_acc_rainrate[:] = OBJ['mean_accum']
-        var_max_acc_rainrate[:] = OBJ['max_accum']
+
+        var_amean_inst_field[:] = OBJ['amean_inst_field']
+        var_amean_running_field[:] = OBJ['amean_running_field']
+        var_amean_filtered_running_field[:] = OBJ['amean_filtered_running_field']
+        var_min_inst_field[:] = OBJ['min_inst_field']
+        var_min_running_field[:] = OBJ['min_running_field']
+        var_min_filtered_running_field[:] = OBJ['min_filtered_running_field']
+        var_max_inst_field[:] = OBJ['max_inst_field']
+        var_max_running_field[:] = OBJ['max_running_field']
+        var_max_filtered_running_field[:] = OBJ['max_filtered_running_field']
 
         for ii in range(len(OBJ['lon'])):
             ypoints, xpoints = np.where(OBJ['label_im'] == ii+1)
@@ -136,7 +155,7 @@ def lp_objects_output_netcdf(fn, OBJ):
     ## Attributes/Metadata
     ##
     var_objid.setncatts({'units':'0','long_name':'LP Object ID'
-        ,'description':'A unique ID for each LP object. Convention is YYYYMMDDHHnnnn where nnnn starts at 0000.'})
+        ,'description':'A unique ID for each LP object. Convention is YYYYMMDDHHnnnn where nnnn starts at 0000. YYYYMMDDHH is the END of running mean time.'})
 
     var_centroid_lon.setncatts({'units':'degrees_east','long_name':'centroid longitude (0-360)'})
     var_centroid_lat.setncatts({'units':'degrees_north','long_name':'centroid latitude (-90-90)'})
@@ -147,10 +166,16 @@ def lp_objects_output_netcdf(fn, OBJ):
     var_min_lon.setncatts({'units':'degrees_east','long_name':'min (westmost) longitude (0-360)'})
     var_min_lat.setncatts({'units':'degrees_north','long_name':'min (southmost) latitude (-90-90)'})
     var_area.setncatts({'units':'km2','long_name':'LP object enclosed area'})
-    var_mean_inst_rainrate.setncatts({'units':'mm h-1','long_name':'LP object mean instantaneous rain rate (at end of accum time).'})
-    var_max_inst_rainrate.setncatts({'units':'mm h-1','long_name':'LP object max instantaneous rain rate (at end of accum time).'})
-    var_mean_acc_rainrate.setncatts({'units':'mm day-1','long_name':'LP object running mean rain rate (at end of accum time).'})
-    var_max_acc_rainrate.setncatts({'units':'mm day-1','long_name':'LP object running mean rain rate (at end of accum time).'})
+
+    var_amean_inst_field.setncatts({'units':OBJ['units_inst'],'long_name':'LP object area mean of instantaneous field', 'note': 'end of running mean time'})
+    var_amean_running_field.setncatts({'units':OBJ['units_running'],'long_name':'LP object area mean of running mean field', 'note': 'end of running mean time'})
+    var_amean_filtered_running_field.setncatts({'units':OBJ['units_filtered'],'long_name':'LP object area mean of filtered running mean field', 'note': 'end of running mean time'})
+    var_min_inst_field.setncatts({'units':OBJ['units_inst'],'long_name':'LP object area min of instantaneous field', 'note': 'end of running mean time'})
+    var_min_running_field.setncatts({'units':OBJ['units_running'],'long_name':'LP objedt area min of running mean field', 'note': 'end of running mean time'})
+    var_min_filtered_running_field.setncatts({'units':OBJ['units_filtered'],'long_name':'LP object area min of filtered running mean field', 'note': 'end of running mean time'})
+    var_max_inst_field.setncatts({'units':OBJ['units_inst'],'long_name':'LP object area max of instantaneous field', 'note': 'end of running mean time'})
+    var_max_running_field.setncatts({'units':OBJ['units_running'],'long_name':'LP object area max of running mean field', 'note': 'end of running mean time'})
+    var_max_filtered_running_field.setncatts({'units':OBJ['units_filtered'],'long_name':'LP object area max of filtered running mean field', 'note': 'end of running mean time'})
 
     var_grid_lon.setncatts({'units':'degrees_east','long_name':'grid longitude (0-360)','standard_name':'longitude','axis':'X'})
     var_grid_lat.setncatts({'units':'degrees_north','long_name':'grid latitude (-90-90)','standard_name':'latitude','axis':'Y'})
@@ -199,12 +224,20 @@ def lpt_systems_group_array_output_ascii(fn, LPT):
     np.savetxt(fn, LPT, fmt='  %14.1f, %14d, %10f, %d, %d, %d, %d', header=header)
 
 
-def lpt_system_tracks_output_netcdf(fn, TIMECLUSTERS):
+def lpt_system_tracks_output_netcdf(fn, TIMECLUSTERS, units={}):
     """
     This function outputs the "bulk" LPT system properties (centroid, date, area)
     plus the LP Objects belonging to each "TIMECLUSTER" to a netcdf file.
     """
     print('Writing LPT system track NetCDF output to: ' + fn)
+
+    if not 'units_inst' in units:
+        print('WARNING: units_inst, units_running, and units_filtered not specified in dict "units". Netcdf file will have empty units.')
+        units['units_inst'] = ''
+        units['units_running'] = ''
+        units['units_filtered'] = ''
+
+
 
     os.makedirs(os.path.dirname(fn), exist_ok=True) # Make directory if needed.
 
@@ -228,10 +261,16 @@ def lpt_system_tracks_output_netcdf(fn, TIMECLUSTERS):
     max_lat_collect = np.array([MISSING])
     min_lat_collect = np.array([MISSING])
     area_collect = np.array([MISSING])
+
     mean_inst_collect = np.array([MISSING])
+    mean_running_collect = np.array([MISSING])
+    mean_filtered_running_collect = np.array([MISSING])
+    min_inst_collect = np.array([MISSING])
+    min_running_collect = np.array([MISSING])
+    min_filtered_running_collect = np.array([MISSING])
     max_inst_collect = np.array([MISSING])
-    mean_accum_collect = np.array([MISSING])
-    max_accum_collect = np.array([MISSING])
+    max_running_collect = np.array([MISSING])
+    max_filtered_running_collect = np.array([MISSING])
 
     lpt_begin_index = []
     lpt_end_index = []
@@ -254,15 +293,17 @@ def lpt_system_tracks_output_netcdf(fn, TIMECLUSTERS):
         min_lon_collect = np.append(np.append(min_lon_collect, TIMECLUSTERS[ii]['min_lon']),MISSING)
         min_lat_collect = np.append(np.append(min_lat_collect, TIMECLUSTERS[ii]['min_lat']),MISSING)
 
-        mean_inst_collect = np.append(np.append(mean_inst_collect, TIMECLUSTERS[ii]['mean_inst']),MISSING)
-        max_inst_collect = np.append(np.append(max_inst_collect, TIMECLUSTERS[ii]['max_inst']),MISSING)
-        mean_accum_collect = np.append(np.append(mean_accum_collect, TIMECLUSTERS[ii]['mean_accum']),MISSING)
-        max_accum_collect = np.append(np.append(max_accum_collect, TIMECLUSTERS[ii]['max_accum']),MISSING)
+        mean_inst_collect = np.append(np.append(mean_inst_collect, TIMECLUSTERS[ii]['amean_inst_field']),MISSING)
+        mean_running_collect = np.append(np.append(mean_running_collect, TIMECLUSTERS[ii]['amean_running_field']),MISSING)
+        mean_filtered_running_collect = np.append(np.append(mean_filtered_running_collect, TIMECLUSTERS[ii]['amean_filtered_running_field']),MISSING)
+        min_inst_collect = np.append(np.append(min_inst_collect, TIMECLUSTERS[ii]['min_inst_field']),MISSING)
+        min_running_collect = np.append(np.append(min_running_collect, TIMECLUSTERS[ii]['min_running_field']),MISSING)
+        min_filtered_running_collect = np.append(np.append(min_filtered_running_collect, TIMECLUSTERS[ii]['min_filtered_running_field']),MISSING)
+        max_inst_collect = np.append(np.append(max_inst_collect, TIMECLUSTERS[ii]['max_inst_field']),MISSING)
+        max_running_collect = np.append(np.append(max_running_collect, TIMECLUSTERS[ii]['max_running_field']),MISSING)
+        max_filtered_running_collect = np.append(np.append(max_filtered_running_collect, TIMECLUSTERS[ii]['max_filtered_running_field']),MISSING)
 
         lpt_end_index += [len(lptid_collect)-2] # zero based, and I added a NaN, so end index is the length.
-
-
-    print(timestamp_collect[0:4],flush=True)
 
     DS.createDimension('nall', len(timestamp_collect))
 
@@ -289,10 +330,15 @@ def lpt_system_tracks_output_netcdf(fn, TIMECLUSTERS):
     var_max_lat_all = DS.createVariable('max_lat_stitched','f4',('nall',),fill_value=FILL_VALUE)
     var_min_lon_all = DS.createVariable('min_lon_stitched','f4',('nall',),fill_value=FILL_VALUE)
     var_min_lat_all = DS.createVariable('min_lat_stitched','f4',('nall',),fill_value=FILL_VALUE)
-    DS.createVariable('mean_inst_rain_rate', 'f4', ('nall',),fill_value=FILL_VALUE)
-    DS.createVariable('max_inst_rain_rate', 'f4', ('nall',),fill_value=FILL_VALUE)
-    DS.createVariable('mean_running_rain_rate', 'f4', ('nall',),fill_value=FILL_VALUE)
-    DS.createVariable('max_running_rain_rate', 'f4', ('nall',),fill_value=FILL_VALUE)
+    DS.createVariable('amean_inst_field', 'f4', ('nall',),fill_value=FILL_VALUE)
+    DS.createVariable('amean_running_field', 'f4', ('nall',),fill_value=FILL_VALUE)
+    DS.createVariable('amean_filtered_running_field', 'f4', ('nall',),fill_value=FILL_VALUE)
+    DS.createVariable('min_inst_field', 'f4', ('nall',),fill_value=FILL_VALUE)
+    DS.createVariable('min_running_field', 'f4', ('nall',),fill_value=FILL_VALUE)
+    DS.createVariable('min_filtered_running_field', 'f4', ('nall',),fill_value=FILL_VALUE)
+    DS.createVariable('max_inst_field', 'f4', ('nall',),fill_value=FILL_VALUE)
+    DS.createVariable('max_running_field', 'f4', ('nall',),fill_value=FILL_VALUE)
+    DS.createVariable('max_filtered_running_field', 'f4', ('nall',),fill_value=FILL_VALUE)
 
 
     ##
@@ -306,7 +352,7 @@ def lpt_system_tracks_output_netcdf(fn, TIMECLUSTERS):
     DS['zonal_propagation_speed'][:] = [TIMECLUSTERS[ii]['zonal_propagation_speed'] for ii in range(len(TIMECLUSTERS))]
     DS['meridional_propagation_speed'][:] = [TIMECLUSTERS[ii]['meridional_propagation_speed'] for ii in range(len(TIMECLUSTERS))]
 
-    print(timestamp_collect[0:4])
+    #print(timestamp_collect[0:4])
     var_timestamp_all[:] = timestamp_collect
     var_lptid_all[:] = lptid_collect
     var_centroid_lon_all[:] = centroid_lon_collect
@@ -317,10 +363,15 @@ def lpt_system_tracks_output_netcdf(fn, TIMECLUSTERS):
     var_min_lon_all[:] = min_lon_collect
     var_min_lat_all[:] = min_lat_collect
 
-    DS['mean_inst_rain_rate'][:] = mean_inst_collect
-    DS['max_inst_rain_rate'][:] = max_inst_collect
-    DS['mean_running_rain_rate'][:] = mean_accum_collect
-    DS['max_running_rain_rate'][:] = max_accum_collect
+    DS['amean_inst_field'][:] = mean_inst_collect
+    DS['amean_running_field'][:] = mean_running_collect
+    DS['amean_filtered_running_field'][:] = mean_filtered_running_collect
+    DS['min_inst_field'][:] = min_inst_collect
+    DS['min_running_field'][:] = min_running_collect
+    DS['min_filtered_running_field'][:] = min_filtered_running_collect
+    DS['max_inst_field'][:] = max_inst_collect
+    DS['max_running_field'][:] = max_running_collect
+    DS['max_filtered_running_field'][:] = max_filtered_running_collect
 
 
     ##
@@ -343,10 +394,15 @@ def lpt_system_tracks_output_netcdf(fn, TIMECLUSTERS):
     var_min_lon_all.setncatts({'units':'degrees_east','long_name':'min (westmost) longitude (0-360) -- stitched','standard_name':'longitude'})
     var_min_lat_all.setncatts({'units':'degrees_north','long_name':'min (southmost) latitude (-90-90) -- stitched','standard_name':'longitude'})
 
-    DS['mean_inst_rain_rate'].setncatts({'units':'mm h-1','long_name':'LP object mean instantaneous rain rate (at end of accum time).'})
-    DS['max_inst_rain_rate'].setncatts({'units':'mm h-1','long_name':'LP object max instantaneous rain rate (at end of accum time).'})
-    DS['mean_running_rain_rate'].setncatts({'units':'mm day-1','long_name':'LP object running mean rain rate (at end of accum time).'})
-    DS['max_running_rain_rate'].setncatts({'units':'mm day-1','long_name':'LP object running mean rain rate (at end of accum time).'})
+    DS['amean_inst_field'].setncatts({'units':'mm h-1','long_name':'LP object mean instantaneous rain rate (at end of running time).'})
+    DS['amean_running_field'].setncatts({'units':'mm day-1','long_name':'LP object running mean, mean rain rate (at end of running time).'})
+    DS['amean_filtered_running_field'].setncatts({'units':'mm day-1','long_name':'LP object filtered running mean, mean rain rate (at end of running time).'})
+    DS['min_inst_field'].setncatts({'units':'mm h-1','long_name':'LP object min instantaneous rain rate (at end of running time).'})
+    DS['min_running_field'].setncatts({'units':'mm day-1','long_name':'LP object running mean, min rain rate (at end of running time).'})
+    DS['min_filtered_running_field'].setncatts({'units':'mm day-1','long_name':'LP object filtered running mean, min rain rate (at end of running time).'})
+    DS['max_inst_field'].setncatts({'units':'mm h-1','long_name':'LP object max instantaneous rain rate (at end of running time).'})
+    DS['max_running_field'].setncatts({'units':'mm day-1','long_name':'LP object running mean, max rain rate (at end of running time).'})
+    DS['max_filtered_running_field'].setncatts({'units':'mm day-1','long_name':'LP object filtered running mean, max rain rate (at end of running time).'})
 
 
     DS.close()
