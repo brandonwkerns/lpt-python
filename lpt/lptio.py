@@ -1,6 +1,7 @@
 import matplotlib; matplotlib.use('agg')
 import numpy as np
 import numpy.ma as ma
+from context import lpt
 from netCDF4 import Dataset
 import os
 import os.path
@@ -217,11 +218,21 @@ def lpt_system_tracks_output_ascii(fn, TIMECLUSTERS):
     file.close()
 
 
-def lpt_systems_group_array_output_ascii(fn, LPT):
+def lpt_systems_group_array_output_ascii(fn, LPT, BRANCHES):
 
     print('Writing LPT system group info (including LP object IDs) to: ' + fn)
-    header='time_stamp__._, YYYYMMDDHHnnnn, lpt_sys_id, B, E, S, branches'
-    np.savetxt(fn, LPT, fmt='  %14.1f, %14d, %10f, %d, %d, %d, %d', header=header)
+    header='time_stamp__, YYYYMMDDHHnnnn, lpt_sys_id, B, E, S, branches\n'
+
+    OUT = []
+    for jj in range(len(BRANCHES)):
+        OUT.append(list(LPT[jj,:]) + [lpt.helpers.branches_binary_str4(BRANCHES[jj])])
+
+    fid = open(fn,'w')
+    fid.write(header)
+    for this_line in OUT:
+        fid.write(("{:12d}, {:14d}, {:10d}, {:1d}, {:1d}, {:1d}, {:s}\n").format(*this_line))
+
+    fid.close()
 
 
 def lpt_system_tracks_output_netcdf(fn, TIMECLUSTERS, units={}):

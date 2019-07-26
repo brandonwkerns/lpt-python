@@ -68,18 +68,18 @@ def lpt_real_time_driver_forecasts(dataset,plotting,output,lpo_options,lpt_optio
                     data_collect += np.array(DATA_RAW['precip'][this_record,:,:])
                 count += 1
 
-            DATA_ACCUM = (data_collect/count) * 24.0 # Get the mean in mm/day.
+            DATA_RUNNING = (data_collect/count) * 24.0 # Get the mean in mm/day.
             print('Accum done.',flush=True)
 
             ## Filter the data
-            DATA_FILTERED = scipy.ndimage.gaussian_filter(DATA_ACCUM, lpo_options['filter_stdev']
+            DATA_FILTERED = scipy.ndimage.gaussian_filter(DATA_RUNNING, lpo_options['filter_stdev']
                 , order=0, output=None, mode='reflect', cval=0.0, truncate=3.0)
             print('filter done.',flush=True)
 
             ## Get LP objects.
             label_im = lpt.helpers.identify_lp_objects(DATA_FILTERED, lpo_options['thresh'], verbose=dataset['verbose'])
             OBJ = lpt.helpers.calculate_lp_object_properties(DATA_RAW['lon'], DATA_RAW['lat']
-                        , DATA_RAW['precip'], DATA_ACCUM, label_im, 0
+                        , DATA_RAW['precip'], DATA_RUNNING, DATA_FILTERED, label_im, 0
                         , end_of_accumulation_time, verbose=True)
             print('objects properties.',flush=True)
 
@@ -102,7 +102,7 @@ def lpt_real_time_driver_forecasts(dataset,plotting,output,lpo_options,lpt_optio
                 fig1.clf()
                 ax1 = fig1.add_subplot(111)
                 lpt.plotting.plot_rain_map_with_filtered_contour(ax1
-                        , DATA_ACCUM, OBJ
+                        , DATA_RUNNING, OBJ
                         , plot_area = plotting['plot_area'])
                 ax1.set_title((dataset['label'].upper() + ' FCST '
                                 + str(lpo_options['accumulation_hours'])
@@ -150,18 +150,18 @@ def lpt_real_time_driver_forecasts(dataset,plotting,output,lpo_options,lpt_optio
         ## Initialize LPT
         #fmt = model_init_time.strftime("/%Y/%m/%Y%m%d") + "/objects_%Y%m%d%H.nc"
         fmt = "/objects_%Y%m%d%H.nc"
-        LPT0 = lpt.helpers.init_lpt_group_array(dt_list, options['objdir'], fmt)
+        LPT0, BRANCHES0 = lpt.helpers.init_lpt_group_array(dt_list, options['objdir'], fmt)
         ## Remove small LPOs
-        LPT0 = lpt.helpers.lpt_group_array_remove_small_objects(LPT0.copy(), options, fmt=fmt)
+        LPT0, BRANCHES0 = lpt.helpers.lpt_group_array_remove_small_objects(LPT0, BRANCHES0, options, fmt=fmt)
 
         ## Connect forward, then backwards
         print('Forward...')
-        LPTf = lpt.helpers.calc_lpt_group_array(LPT0.copy(), options, verbose=True, fmt=fmt)
+        LPTf, BRANCHESf = lpt.helpers.calc_lpt_group_array(LPT0, BRANCHES0, options, verbose=True, fmt=fmt)
         print('Backward...')
-        LPTb = lpt.helpers.calc_lpt_group_array(LPT0.copy(), options, verbose=True, reversed=True, fmt=fmt)
+        LPTb, BRANCHESb = lpt.helpers.calc_lpt_group_array(LPT0, BRANCHES0, options, verbose=True, reversed=True, fmt=fmt)
 
         ## Overlap forward and backward connections.
-        LPTfb = lpt.helpers.overlap_forward_backward(LPTf.copy(), LPTb.copy(), options, verbose=True)
+        LPTfb, BRANCHESfb = lpt.helpers.overlap_forward_backward(LPTf, LPTb, BRANCHESf, BRANCHESb, options, verbose=True)
 
         ## Allow center jumps.
         print(('Allow center jumps up to ' + str(options['center_jump_max_hours']) + ' hours.'))
@@ -173,16 +173,35 @@ def lpt_real_time_driver_forecasts(dataset,plotting,output,lpo_options,lpt_optio
 
         ## Eliminate short duration systems.
         print(('Remove LPT shorter than ' + str(options['min_lpt_duration_hours']) + ' hours.'))
-        LPT_remove_short = lpt.helpers.remove_short_lived_systems(LPT_center_jumps, options['min_lpt_duration_hours']
+        LPT_remove_short, BRANCHES_remove_short = lpt.helpers.remove_short_lived_systems(LPT_center_jumps, BRANCHESfb, options['min_lpt_duration_hours']
                                 , latest_datetime = latest_lp_object_time - dt.timedelta(hours=options['min_lpt_duration_hours']))
+
+
+
+        ## Handle splitting and merging, if specified.
+        if merge_split_options['allow_merge_split']:
+            LPT, BRANCHES = lpt.helpers.lpt_group_id_separate_branches(LPT_remove_short, BRANCHES_remove_short, options, verbose=True, fmt=fmt)
+            LPT, BRANCHES = lpt.helpers.lpt_split_and_merge(LPT, BRANCHES, merge_split_options)
+        else:
+            LPT = LPT_remove_short.copy()
+            BRANCHES = BRANCHES_remove_short.copy()
 
         ## Get "timeclusters" tracks.
         print('Calculating LPT properties.')
-        TIMECLUSTERS = lpt.helpers.calc_lpt_system_group_properties(LPT_remove_short, options, fmt=fmt)
+        if merge_split_options['allow_merge_split']:
+            TIMECLUSTERS = lpt.helpers.calc_lpt_system_group_properties_with_branches(LPT, BRANCHES, options, fmt)
+        else:
+            TIMECLUSTERS = lpt.helpers.calc_lpt_system_group_properties(LPT, options, fmt)
+
+
+        ## Get "timeclusters" tracks.
+        #print('Calculating LPT properties.')
+        #TIMECLUSTERS = lpt.helpers.calc_lpt_system_group_properties(LPT_remove_short, options, fmt=fmt)
 
         fn_tc_base = (options['outdir'] #+ '/' + end_of_accumulation_time.strftime(output['sub_directory_format'])
                          + '/lpt_systems_' + dataset['label'] + '_init' + YMDHi + '__' + str(options['lpt_history_days']) + 'days')
         lpt.lptio.lpt_system_tracks_output_ascii(fn_tc_base + '.txt', TIMECLUSTERS)
+        lpt.lptio.lpt_systems_group_array_output_ascii(fn_tc_base + '.group_array.txt', LPT, BRANCHES)
         lpt.lptio.lpt_system_tracks_output_netcdf(fn_tc_base + '.nc', TIMECLUSTERS)
 
 

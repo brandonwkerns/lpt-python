@@ -139,19 +139,19 @@ def lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,merge_s
         dt_list = [begin_tracking_time + dt.timedelta(hours=x) for x in range(0, 24*lpt_options['lpt_history_days']+1, dataset['data_time_interval'])]
 
         ## Initialize LPT
-        LPT0 = lpt.helpers.init_lpt_group_array(dt_list, options['objdir'])
+        LPT0, BRANCHES0 = lpt.helpers.init_lpt_group_array(dt_list, options['objdir'])
 
         ## Remove small LPOs
-        LPT0 = lpt.helpers.lpt_group_array_remove_small_objects(LPT0.copy(), options)
+        LPT0, BRANCHES0 = lpt.helpers.lpt_group_array_remove_small_objects(LPT0, BRANCHES0, options)
 
         ## Connect forward, then backwards
         print('Forward...')
-        LPTf = lpt.helpers.calc_lpt_group_array(LPT0.copy(), options, verbose=True)
+        LPTf, BRANCHESf = lpt.helpers.calc_lpt_group_array(LPT0, BRANCHES0, options, verbose=True)
         print('Backward...')
-        LPTb = lpt.helpers.calc_lpt_group_array(LPT0.copy(), options, verbose=True, reversed=True)
+        LPTb, BRANCHESb = lpt.helpers.calc_lpt_group_array(LPT0, BRANCHES0, options, verbose=True, reversed=True)
 
         ## Overlap forward and backward connections.
-        LPTfb = lpt.helpers.overlap_forward_backward(LPTf.copy(), LPTb.copy(), options, verbose=True)
+        LPTfb, BRANCHESfb = lpt.helpers.overlap_forward_backward(LPTf, LPTb, BRANCHESf, BRANCHESb, options, verbose=True)
 
         ## Allow center jumps.
         print(('Allow center jumps up to ' + str(options['center_jump_max_hours']) + ' hours.'))
@@ -163,16 +163,34 @@ def lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,merge_s
 
         ## Eliminate short duration systems.
         print(('Remove LPT shorter than ' + str(options['min_lpt_duration_hours']) + ' hours.'))
-        LPT_remove_short = lpt.helpers.remove_short_lived_systems(LPT_center_jumps, options['min_lpt_duration_hours']
+        LPT_remove_short, BRANCHES_remove_short = lpt.helpers.remove_short_lived_systems(LPT_center_jumps, BRANCHESfb, options['min_lpt_duration_hours']
                                 , latest_datetime = latest_lp_object_time - dt.timedelta(hours=options['min_lpt_duration_hours']))
 
+
+        ## Handle splitting and merging, if specified.
+        if merge_split_options['allow_merge_split']:
+            LPT, BRANCHES = lpt.helpers.lpt_group_id_separate_branches(LPT_remove_short, BRANCHES_remove_short, options, verbose=True)
+            LPT, BRANCHES = lpt.helpers.lpt_split_and_merge(LPT, BRANCHES, merge_split_options)
+        else:
+            LPT = LPT_remove_short.copy()
+            BRANCHES = BRANCHES_remove_short.copy()
+
+        print(BRANCHES)
         ## Get "timeclusters" tracks.
         print('Calculating LPT properties.')
-        TIMECLUSTERS = lpt.helpers.calc_lpt_system_group_properties(LPT_remove_short, options)
+        if merge_split_options['allow_merge_split']:
+            TIMECLUSTERS = lpt.helpers.calc_lpt_system_group_properties_with_branches(LPT, BRANCHES, options)
+        else:
+            TIMECLUSTERS = lpt.helpers.calc_lpt_system_group_properties(LPT, options)
+
+        ## Get "timeclusters" tracks.
+        #print('Calculating LPT properties.')
+        #TIMECLUSTERS = lpt.helpers.calc_lpt_system_group_properties(LPT_remove_short, options)
 
         fn_tc_base = (options['outdir'] + '/' + end_of_accumulation_time.strftime(output['sub_directory_format'])
                          + '/lpt_systems_tmpa_rt_' + YMDH + '__' + str(options['lpt_history_days']) + 'days')
         lpt.lptio.lpt_system_tracks_output_ascii(fn_tc_base + '.txt', TIMECLUSTERS)
+        lpt.lptio.lpt_systems_group_array_output_ascii(fn_tc_base + '.group_array.txt', LPT, BRANCHES)
         lpt.lptio.lpt_system_tracks_output_netcdf(fn_tc_base + '.nc', TIMECLUSTERS)
 
 
