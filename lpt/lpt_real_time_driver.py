@@ -188,7 +188,7 @@ def lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,merge_s
         #TIMECLUSTERS = lpt.helpers.calc_lpt_system_group_properties(LPT_remove_short, options)
 
         fn_tc_base = (options['outdir'] + '/' + end_of_accumulation_time.strftime(output['sub_directory_format'])
-                         + '/lpt_systems_tmpa_rt_' + YMDH + '__' + str(options['lpt_history_days']) + 'days')
+                         + '/lpt_systems_' + dataset['label'] + '_rt_' + YMDH + '__' + str(options['lpt_history_days']) + 'days')
         lpt.lptio.lpt_system_tracks_output_ascii(fn_tc_base + '.txt', TIMECLUSTERS)
         lpt.lptio.lpt_systems_group_array_output_ascii(fn_tc_base + '.group_array.txt', LPT, BRANCHES)
         lpt.lptio.lpt_system_tracks_output_netcdf(fn_tc_base + '.nc', TIMECLUSTERS)
