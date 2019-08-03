@@ -698,12 +698,17 @@ def lpt_group_id_separate_branches(LPT, BRANCHES, options, verbose=True, fmt="/%
                         if len(lpt_indices_at_this_time_matches) < 1:
                             continue # Should only happen if it is a center jump situation.
 
+                        #print('lpt_indices_at_this_time_matches = ' + str(lpt_indices_at_this_time_matches))
                         move_forward_idx = lpt_indices_at_this_time_matches[0] # Always take the first (e.g., leftmost) available direction.
+                                                                               # The others will get done in subsequent iterations.
 
                         BRANCHES3[move_forward_idx] = BRANCHES3[move_forward_idx] | int(2**current_branch) # Bitwise or
+                        ## In case the first entry in the group is a split point.
+                        #prev_idx = 1 * move_forward_idx  # HACK -- to get MERRA2 2003 to run through. It has a split at the initial time!
+
 
                         ## If I hit splitting node, take this branch out of "already matched indices".
-                        if len(lpt_indices_at_this_time_matches) > 1 and LPT3[prev_idx,5] == 1:
+                        if len(lpt_indices_at_this_time_matches) > 1 and LPT3[prev_idx,5] >= 1:
                             idx_with_this_branch = [ x for x in this_lpt_group_idx_all if BRANCHES3[x] & int(2**current_branch) ]
                             for kk in idx_with_this_branch:
                                 if kk in already_matched_indices:
@@ -719,6 +724,7 @@ def lpt_group_id_separate_branches(LPT, BRANCHES, options, verbose=True, fmt="/%
                         ## Break out of TIME loop if I have found an end node point.
                         if LPT3[move_forward_idx,4] == 1:
                             break
+
 
                 #if niter > 0:
                 #    more_to_do = False
@@ -858,8 +864,9 @@ def lpt_split_and_merge(LPT0, BRANCHES0, merge_split_options):
             more_to_do = False
             niter+=1
 
-            #if niter > 5:
-            #    break
+            if niter > 50:
+                print('WARNING! EXCEEDED 50 ITERATIONS AND GIVING UP. THIS SHOULD NOT HAPPEN.')
+                break
 
             print('------------------------')
             print('Iteration #' + str(niter))
@@ -919,6 +926,11 @@ def lpt_split_and_merge(LPT0, BRANCHES0, merge_split_options):
                         dt2all_begin = dt2all_list[0]
                         dt2all_end = dt2all_list[-1] #get_objid_datetime(LPT[np.max(lpt_diff1),1])
 
+                        ######################################################
+                        ## Must begin and end with the same date to qualify as split-then-merge.
+                        ######################################################
+                        if not (dt1all_begin == dt2all_begin and dt1all_end == dt2all_end):
+                            continue
 
                         lpt_diff1 = lpt_branches_difference(LPT, BRANCHES, this_group, this_branch, other_branch)
                         if len(lpt_diff1) > 0:
@@ -968,26 +980,30 @@ def lpt_split_and_merge(LPT0, BRANCHES0, merge_split_options):
                                 print("--> Combine these LPT branches.")
 
 
-                                # Remove the smaller branch.
-                                branches_to_remove = get_group_branches_as_list(BRANCHES[lpt_diff2[0]])
-                                for branch_to_remove in branches_to_remove:
-                                    LPT, BRANCHES = remove_branch_from_group(LPT, BRANCHES, this_group, branch_to_remove)
+                                # Remove one of the branches.
+                                # It is OK to have duplicates here, as they will get removed before moving to "Rejoin 2" step.
+                                #branches_to_remove = get_group_branches_as_list(BRANCHES[lpt_diff1[0]])
+
+                                #for branch_to_remove in branches_to_remove:
+                                #    LPT, BRANCHES = remove_branch_from_group(LPT, BRANCHES, this_group, branch_to_remove)
 
                                 # Assign those LPT group array indices to the larger branch.
+
                                 for jj in lpt_diff2:
                                     for kk in lpt_diff1:
                                         ## Only "inherit" larger branches for the relevant time span.
                                         kkdt = get_objid_datetime(LPT[kk,1])
                                         if kkdt >= dt2_begin and kkdt <= dt2_end:
-                                            #LPT[jj,6] = int(LPT[jj,6]) | int(LPT[kk,6])
                                             BRANCHES[jj] = BRANCHES[jj] | BRANCHES[kk]
+                                            BRANCHES[kk] = BRANCHES[jj] | BRANCHES[kk]
 
                                 more_to_do = True
-
 
                     if more_to_do:
                         #more_to_do = False
                         break
+
+        BRANCHES = remove_duplicate_branches(LPT, BRANCHES)
 
 
         ########################################################################
@@ -1005,8 +1021,10 @@ def lpt_split_and_merge(LPT0, BRANCHES0, merge_split_options):
             more_to_do = False
             niter+=1
 
-            #if niter > 5:
-            #    break
+
+            if niter > 50:
+                print('WARNING! EXCEEDED 50 ITERATIONS AND GIVING UP. THIS SHOULD NOT HAPPEN.')
+                break
 
             print('------------------------')
             print('Iteration #' + str(niter))
@@ -1070,7 +1088,7 @@ def lpt_split_and_merge(LPT0, BRANCHES0, merge_split_options):
                         lpt_diff1 = lpt_branches_difference(LPT, BRANCHES, this_group, this_branch, other_branch)
                         if len(lpt_diff1) > 0:
 
-                            #print('Diff1: ' + str(lpt_diff1))
+                            print('Diff1: ' + str(lpt_diff1))
                             dt1_list = sorted(np.unique([get_objid_datetime(LPT[xx,1]) for xx in lpt_diff1]))
                             dt1_begin = dt1_list[0]
                             dt1_end = dt1_list[-1] #get_objid_datetime(LPT[np.max(lpt_diff1),1])
@@ -1084,7 +1102,7 @@ def lpt_split_and_merge(LPT0, BRANCHES0, merge_split_options):
 
                         lpt_diff2 = lpt_branches_difference(LPT, BRANCHES, this_group, other_branch, this_branch)
                         if len(lpt_diff2) > 0:
-                            #print('Diff2: ' + str(lpt_diff2))
+                            print('Diff2: ' + str(lpt_diff2))
                             dt2_list = sorted(np.unique([get_objid_datetime(LPT[xx,1]) for xx in lpt_diff2]))
                             dt2_begin = dt2_list[0]
                             dt2_end = dt2_list[-1] #get_objid_datetime(LPT[np.max(lpt_diff1),1])
@@ -1132,7 +1150,6 @@ def lpt_split_and_merge(LPT0, BRANCHES0, merge_split_options):
                                             ## Only "inherit" larger branches for the relevant time span.
                                             kkdt = get_objid_datetime(LPT[kk,1])
                                             if kkdt >= dt2_begin and kkdt <= dt2_end:
-                                                #LPT[jj,6] = int(LPT[jj,6]) | int(LPT[kk,6])
                                                 BRANCHES[jj] = BRANCHES[jj] | BRANCHES[kk]
 
                                 else:
@@ -1150,7 +1167,6 @@ def lpt_split_and_merge(LPT0, BRANCHES0, merge_split_options):
                                             ## Only "inherit" larger branches for the relevant time span.
                                             kkdt = get_objid_datetime(LPT[kk,1])
                                             if kkdt >= dt1_begin and kkdt <= dt1_end:
-                                                #LPT[jj,6] = int(LPT[jj,6]) | int(LPT[kk,6])
                                                 BRANCHES[jj] = BRANCHES[jj] | BRANCHES[kk]
 
                                 more_to_do = True
@@ -1161,9 +1177,43 @@ def lpt_split_and_merge(LPT0, BRANCHES0, merge_split_options):
                         #more_to_do = False
                         break
 
+    BRANCHES = remove_duplicate_branches(LPT, BRANCHES)
 
     return (LPT, BRANCHES)
 
+
+def remove_duplicate_branches(LPT0, BRANCHES0):
+
+    LPT = LPT0.copy()
+    BRANCHES = BRANCHES0.copy()
+
+    unique_lpt_groups = np.unique(LPT[:,2])
+
+    for this_lpt_group in range(len(unique_lpt_groups)):
+        this_lpt_group_idx = np.where(LPT[:,2] == this_lpt_group)[0]
+
+
+        branch_list = get_branches_in_lpt_group(LPT, BRANCHES, this_lpt_group)
+
+        branches_to_remove = []
+
+        for this_branch in branch_list:
+            if this_branch in branches_to_remove:
+                continue
+            for other_branch in branch_list:
+                if other_branch == this_branch:
+                    continue
+                else:
+                    lpt_all1 = lpt_branches_indices_list(LPT, BRANCHES, this_lpt_group, this_branch)
+                    lpt_all2 = lpt_branches_indices_list(LPT, BRANCHES, this_lpt_group, other_branch)
+
+                    if len(list(set(lpt_all1) - set(lpt_all2))) < 1:
+                        branches_to_remove.append(other_branch)
+
+        for branch_to_remove in branches_to_remove:
+            LPT, BRANCHES = remove_branch_from_group(LPT, BRANCHES, this_lpt_group, branch_to_remove)
+
+    return BRANCHES
 
 def remove_short_lived_systems(LPT, BRANCHES, minimum_duration_hours, latest_datetime = dt.datetime(2063,4,5,0,0,0)):
 
@@ -1225,13 +1275,25 @@ def reorder_LPT_branches(LPT0, BRANCHES0):
     """
     LPT = LPT0.copy()
     BRANCHES = BRANCHES0.copy()
+
     ## Re-order LPT system groups
     unique_lpt_groups = np.unique(LPT[:,2])
 
     for this_group in unique_lpt_groups:
-        idx_this_lpt_group = [x for x in len(BRANCHES) if LPT[x,2] == this_group]
+        idx_this_lpt_group = [x for x in range(len(BRANCHES)) if LPT[x,2] == this_group]
+        list_of_branches_old = get_branches_in_lpt_group(LPT, BRANCHES, this_group)
 
-    return LPT
+        for this_idx in idx_this_lpt_group:
+            old_branches = BRANCHES0[this_idx]
+            new_branches = 0
+
+            for ii in range(len(list_of_branches_old)):
+                if 2**(list_of_branches_old[ii]-1) & old_branches > 0:
+                    new_branches = new_branches | 2**ii
+
+            BRANCHES[this_idx] = new_branches
+
+    return BRANCHES
 
 
 
@@ -1352,11 +1414,20 @@ def calc_lpt_system_group_properties_with_branches(LPT, BRANCHES, options, fmt="
     for this_group in unique_lpt_groups:
 
         this_branch_list = get_branches_in_lpt_group(LPT, BRANCHES, this_group)
+        group_max_branch = get_group_max_branch(LPT, BRANCHES, this_group)
 
         for this_branch in this_branch_list:
             TC_this = {}
             TC_this['lpt_group_id'] = this_group
-            TC_this['lpt_id'] = this_group + this_branch / 100.0
+            if group_max_branch < 100:
+                TC_this['lpt_id'] = this_group + this_branch / 100.0
+            elif group_max_branch >= 100 and group_max_branch < 1000:
+                TC_this['lpt_id'] = this_group + this_branch / 1000.0
+            elif group_max_branch >= 1000 and group_max_branch < 10000:
+                TC_this['lpt_id'] = this_group + this_branch / 10000.0
+            else:
+                print('WARNING: BRANCH ID > 9999!!!! Setting it to zero.')
+                TC_this['lpt_id'] = this_group
 
             this_lpt_group_idx = [x for x in range(len(LPT[:,0])) if LPT[x,2] == this_group and (BRANCHES[x] & 2**(this_branch-1))]
             TC_this['objid'] = LPT[this_lpt_group_idx,1]
