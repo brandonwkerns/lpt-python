@@ -57,8 +57,8 @@ output['sub_directory_format'] = '%Y/%m/%Y%m%d'
 
 ## LP Object settings
 lpo_options={}
-lpo_options['do_lpo_calc'] = True
-#lpo_options['do_lpo_calc'] = False
+#lpo_options['do_lpo_calc'] = True
+lpo_options['do_lpo_calc'] = False
 lpo_options['thresh'] = 12.0                 # LP Objects threshold
 lpo_options['accumulation_hours'] = 72       # Accumulation period for LP objects.
 lpo_options['filter_stdev'] = 20             # Gaussian filter width, in terms of grid points.
