@@ -200,12 +200,12 @@ def lpt_system_tracks_output_ascii(fn, TIMECLUSTERS):
     file = open(fn, 'w')
 
     ## Header
-    file.write("LPT nnnn.nn\n")
+    file.write("LPT nnnnn.nnnn\n")
     file.write("        YYYYMMDDHH _A_[km2] cen_lat.__ cen_lon.__ Nobj\n")
 
     ## Data
     for ii in range(len(TIMECLUSTERS)):
-        file.write("LPT %07.2f\n" % (TIMECLUSTERS[ii]['lpt_id'],))
+        file.write("LPT %10.4f\n" % (TIMECLUSTERS[ii]['lpt_id'],))
 
         for tt in range(len(TIMECLUSTERS[ii]['datetime'])):
             year,month,day,hour = TIMECLUSTERS[ii]['datetime'][tt].timetuple()[0:4]
@@ -233,6 +233,27 @@ def lpt_systems_group_array_output_ascii(fn, LPT, BRANCHES):
         fid.write(("{:12d}, {:14d}, {:10d}, {:1d}, {:1d}, {:1d}, {:s}\n").format(*this_line))
 
     fid.close()
+
+
+def read_lpt_systems_group_array(fn):
+
+    fid = open(fn,'r')
+    LPT = []
+    BRANCHES = []
+
+    for this_line in fid.readlines()[1:]:
+
+        entry_list = this_line.split(',')
+        this_lpt_row = [int(x) for x in entry_list[0:6]]
+        LPT.append(this_lpt_row)
+        BRANCHES.append(int(entry_list[6].replace(" ", ""), 2))
+
+    fid.close()
+    LPT = np.array(LPT)
+
+    return (LPT, BRANCHES)
+
+
 
 
 def lpt_system_tracks_output_netcdf(fn, TIMECLUSTERS, units={}):
