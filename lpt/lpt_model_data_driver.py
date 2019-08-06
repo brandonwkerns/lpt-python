@@ -39,8 +39,6 @@ def lpt_model_data_driver(dataset,plotting,output,lpo_options,lpt_options,merge_
     fmt = '%Y-%m-%d_%H:00:00'
     begin_time = dt.datetime.strptime(time_stamp_list[0], fmt)
     end_time = dt.datetime.strptime(time_stamp_list[-1], fmt)
-
-    #hours_list = [(x - begin_time).total_seconds()/3600.0 for x in time_stamp_list]
     time_list = [dt.datetime.strptime(x, fmt) for x in time_stamp_list]
 
 
@@ -78,9 +76,6 @@ def lpt_model_data_driver(dataset,plotting,output,lpo_options,lpt_options,merge_
             DATA_RAW1 = dataset['read_function'](end_of_accumulation_time, raw_data_parent_dir = dataset['raw_data_parent_dir'], verbose=dataset['verbose'])
             DATA_RAW0 = dataset['read_function'](beginning_of_accumulation_time, raw_data_parent_dir = dataset['raw_data_parent_dir'], verbose=dataset['verbose'])
 
-            #DATA_RAW1['precip'][DATA_RAW1['precip'] < -0.01] = 0.0
-            #DATA_RAW0['precip'][DATA_RAW0['precip'] < -0.01] = 0.0
-
             DATA_RUNNING = ((DATA_RAW1['precip'] - DATA_RAW0['precip']) / hours_to_divide) * 24.0 # Get the mean in mm/day.
             print('Running mean done.',flush=True)
 
@@ -115,7 +110,6 @@ def lpt_model_data_driver(dataset,plotting,output,lpo_options,lpt_options,merge_
             os.makedirs(objects_dir, exist_ok = True)
             objects_fn = (objects_dir + '/objects_' + YMDH)
             lpt.lptio.lp_objects_output_ascii(objects_fn, OBJ)
-            #if (len(OBJ['n_points']) > 0):
             lpt.lptio.lp_objects_output_netcdf(objects_fn + '.nc', OBJ)
 
             """
@@ -144,9 +138,6 @@ def lpt_model_data_driver(dataset,plotting,output,lpo_options,lpt_options,merge_
                 lpt.plotting.print_and_save(file_out_base)
                 fig1.clf()
 
-            #except FileNotFoundError:
-            #    print('Data not yet available up to this point. Skipping.')
-
 
     """
     LPT Tracking Calculations (i.e., connect LP Objects in time)
@@ -157,6 +148,10 @@ def lpt_model_data_driver(dataset,plotting,output,lpo_options,lpt_options,merge_
                     + '_' + str(int(lpo_options['accumulation_hours'])) + 'h'
                     + '/thresh' + str(int(lpo_options['thresh'])) + '/objects')
     options['outdir'] = (output['data_dir'] + '/' + dataset['label']
+                    + '/' + filter_str(lpo_options['filter_stdev'])
+                    + '_' + str(int(lpo_options['accumulation_hours'])) + 'h'
+                    + '/thresh' + str(int(lpo_options['thresh'])) + '/systems')
+    options['imgdir'] = (output['img_dir'] + '/' + dataset['label']
                     + '/' + filter_str(lpo_options['filter_stdev'])
                     + '_' + str(int(lpo_options['accumulation_hours'])) + 'h'
                     + '/thresh' + str(int(lpo_options['thresh'])) + '/systems')
@@ -279,8 +274,7 @@ def lpt_model_data_driver(dataset,plotting,output,lpo_options,lpt_options,merge_
 
             ax2.text(0.87,1.02,'(<15$\degree$S, >15$\degree$N Dashed)', transform=ax2.transAxes)
 
-            img_dir2 = (output['img_dir'] + '/' + dataset['label'] + '/systems/'
-                            + end_time.strftime(output['sub_directory_format']))
+            img_dir2 = (options['imgdir'] + end_time.strftime(output['sub_directory_format']))
 
             os.makedirs(img_dir2, exist_ok = True)
             file_out_base = (img_dir2 + '/lpt_time_lon_' + dataset['label'] + '_' + YMDHb + '_' + YMDH)
