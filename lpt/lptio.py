@@ -64,8 +64,13 @@ def lp_objects_output_netcdf(fn, OBJ):
     DS.createDimension('nobj', 0)  # Unlimited demension.
 
     ## Grid stuff.
-    DS.createDimension('grid_x', len(OBJ['grid']['lon']))
-    DS.createDimension('grid_y', len(OBJ['grid']['lat']))
+    if OBJ['grid']['lon'].ndim == 1:
+        DS.createDimension('grid_x', len(OBJ['grid']['lon']))
+        DS.createDimension('grid_y', len(OBJ['grid']['lat']))
+    else:
+        ny,nx=OBJ['grid']['lon'].shape
+        DS.createDimension('grid_x', nx)
+        DS.createDimension('grid_y', ny)
 
     ##
     ## Variables
@@ -139,8 +144,13 @@ def lp_objects_output_netcdf(fn, OBJ):
 
 
     ## Grid variables.
-    var_grid_lon = DS.createVariable('grid_lon','f4',('grid_x',))
-    var_grid_lat = DS.createVariable('grid_lat','f4',('grid_y',))
+    if OBJ['grid']['lon'].ndim == 1:
+        var_grid_lon = DS.createVariable('grid_lon','f4',('grid_x',))
+        var_grid_lat = DS.createVariable('grid_lat','f4',('grid_y',))
+    else:
+        var_grid_lon = DS.createVariable('grid_lon','f4',('grid_y','grid_x'))
+        var_grid_lat = DS.createVariable('grid_lat','f4',('grid_y','grid_x'))
+
     var_grid_area = DS.createVariable('grid_area','f4',('grid_y','grid_x',), zlib=True)
     var_grid_mask = DS.createVariable('grid_mask','i4',('grid_y','grid_x',), zlib=True, fill_value=-1)
 

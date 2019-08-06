@@ -13,20 +13,14 @@ plt.close('all')
 plt.ioff()
 
 """
-**** Real-time LPT driver script for CMORPH RT data. ****
+**** LPT driver script for historical TRMM TMPA "3B42" data. ****
 
-If no command line arguements, it uses the latest data closest to real time.
-The date and how far back to calculate can be specified on the command line
-which can be useful for filling in previous/missing data.
 
 Example usage:
-   python lpt_real_time_driver__cmorph.py
-   python lpt_real_time_driver__cmorph.py 2019040100 72
+   python lpt_historical_data_driver__tmpa.py 2011060100 2012063021
 
 
 *** Note: raw data directory on your system is set in readdata.py ***
-*** Note: the "72" back filling time is for updating LP Objects.  ***
-***    LPT goes back "history_length" specified below.            ***
 """
 
 """
@@ -57,8 +51,8 @@ output['sub_directory_format'] = '%Y/%m/%Y%m%d'
 
 ## LP Object settings
 lpo_options={}
-#lpo_options['do_lpo_calc'] = True
-lpo_options['do_lpo_calc'] = False
+lpo_options['do_lpo_calc'] = True
+#lpo_options['do_lpo_calc'] = False
 lpo_options['thresh'] = 12.0                 # LP Objects threshold
 lpo_options['accumulation_hours'] = 72       # Accumulation period for LP objects.
 lpo_options['filter_stdev'] = 20             # Gaussian filter width, in terms of grid points.
@@ -67,9 +61,9 @@ lpo_options['filter_stdev'] = 20             # Gaussian filter width, in terms o
 lpt_options={}
 #lpt_options['do_lpt_calc'] = False
 lpt_options['do_lpt_calc'] = True
-lpt_options['min_overlap_points'] = 250      # LP object connectivity is based on points
+lpt_options['min_overlap_points'] = 1600      # LP object connectivity is based on points
 lpt_options['min_overlap_frac'] = 0.5         # -- OR fraction of either LP object.
-lpt_options['min_lp_objects_points'] = 300    # Disregard LP objects smaller than this.
+lpt_options['min_lp_objects_points'] = 400    # Disregard LP objects smaller than this.
 lpt_options['min_lpt_duration_hours'] = 7*24  # Minumum duration to keep it as an LPT
 lpt_options['center_jump_max_hours'] = 3*24   # How long to allow center jumps
 

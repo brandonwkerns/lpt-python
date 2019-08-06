@@ -567,3 +567,29 @@ def get_merra2_6h_rain(dt_ending, verbose=False
     DATA['precip'] = precip
 
     return DATA
+
+
+## WRF Rainfall Data
+## First read in d01.
+## TO DO: replace grid points with d02, ect., where appropriate.
+
+def get_wrfout_rain(dt_ending, verbose=False, raw_data_parent_dir='./'):
+
+    fmt = '%Y-%m-%d_%H:00:00'
+    timestamp_ending = dt_ending.strftime(fmt)
+    DS = Dataset(raw_data_parent_dir + '/wrfout_d01_' + timestamp_ending)
+
+    lon = DS['XLONG'][:][0]
+    lat = DS['XLAT'][:][0]
+    precip = DS['RAINC'][:][0] + DS['RAINNC'][:][0]
+    if 'RAINSH' in DS.variables:
+        precip += DS['RAINSH'][:][0]
+
+    DS.close()
+
+    DATA={}
+    DATA['lon'] = lon
+    DATA['lat'] = lat
+    DATA['precip'] = precip
+
+    return DATA

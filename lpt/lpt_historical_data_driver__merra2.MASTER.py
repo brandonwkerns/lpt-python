@@ -62,9 +62,9 @@ lpt_options={}
 lpt_options['do_lpt_calc'] = True
 #lpt_options['do_lpt_calc'] = False
 lpt_options['lpt_history_days'] = 60          # How many days to go back for LPT tracking and time-lon plot.
-lpt_options['min_overlap_points'] = 12000     # LP object connectivity is based on points
+lpt_options['min_overlap_points'] = 300     # LP object connectivity is based on points
 lpt_options['min_overlap_frac'] = 0.5         # -- OR fraction of either LP object.
-lpt_options['min_lp_objects_points'] = 300    # Disregard LP objects smaller than this.
+lpt_options['min_lp_objects_points'] = 75    # Disregard LP objects smaller than this.
 lpt_options['min_lpt_duration_hours'] = 7*24  # Minumum duration to keep it as an LPT
 lpt_options['center_jump_max_hours'] = 3*24   # How long to allow center jumps
 
