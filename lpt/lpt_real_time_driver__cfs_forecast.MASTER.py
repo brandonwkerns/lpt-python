@@ -60,9 +60,9 @@ output['sub_directory_format'] = '%Y/%m/%Y%m%d'
 
 ## LP Object settings
 lpo_options={}
-lpo_options['thresh'] = 14.0                 # LP Objects threshold
+lpo_options['thresh'] = 15.0                 # LP Objects threshold
 lpo_options['accumulation_hours'] = 72       # Accumulation period for LP objects.
-lpo_options['filter_stdev'] = 5             # Gaussian filter width, in terms of grid points.
+lpo_options['filter_stdev'] = 4             # Gaussian filter width, in terms of grid points.
 
 ## LPT Settings
 lpt_options={}
@@ -75,9 +75,14 @@ lpt_options['min_lp_objects_points'] = 25    # Disregard LP objects smaller than
 lpt_options['min_lpt_duration_hours'] = 7*24  # Minumum duration to keep it as an LPT
 lpt_options['center_jump_max_hours'] = 3*24   # How long to allow center jumps
 
+## Merging/Splitting settings
+merge_split_options={}
+merge_split_options['allow_merge_split'] = True
+#merge_split_options['allow_merge_split'] = False
+merge_split_options['split_merger_min_hours'] = 72     # Min duration of a split/merging track to separate it.
 
 """
 Call the real time driver function.
 """
 
-lpt_real_time_driver_forecasts(dataset,plotting,output,lpo_options,lpt_options,None, sys.argv)
+lpt_real_time_driver_forecasts(dataset,plotting,output,lpo_options,lpt_options, merge_split_options, sys.argv)
