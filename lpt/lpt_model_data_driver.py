@@ -227,7 +227,7 @@ def lpt_model_data_driver(dataset,plotting,output,lpo_options,lpt_options,merge_
         else:
             TIMECLUSTERS = lpt.helpers.calc_lpt_system_group_properties(LPT, options, fmt = "/"+output['sub_directory_format'] + "/objects_%Y%m%d%H.nc")
 
-        fn_tc_base = (options['outdir'] #+ '/' + end_time.strftime(output['sub_directory_format'])
+        fn_tc_base = (options['outdir'] + '/' + end_time.strftime(output['sub_directory_format'])
                          + '/lpt_systems_' + dataset['label'] + '_' + YMDHb + '_' + YMDH)
         lpt.lptio.lpt_system_tracks_output_ascii(fn_tc_base + '.txt', TIMECLUSTERS)
         lpt.lptio.lpt_systems_group_array_output_ascii(fn_tc_base + '.group_array.txt', LPT, BRANCHES)
@@ -279,8 +279,8 @@ def lpt_model_data_driver(dataset,plotting,output,lpo_options,lpt_options,merge_
 
             ax2.text(0.87,1.02,'(<15$\degree$S, >15$\degree$N Dashed)', transform=ax2.transAxes)
 
-            img_dir2 = (output['img_dir'] + '/' + dataset['label'] + '/systems/')
-            #                + end_time.strftime(output['sub_directory_format']))
+            img_dir2 = (output['img_dir'] + '/' + dataset['label'] + '/systems/'
+                            + end_time.strftime(output['sub_directory_format']))
 
             os.makedirs(img_dir2, exist_ok = True)
             file_out_base = (img_dir2 + '/lpt_time_lon_' + dataset['label'] + '_' + YMDHb + '_' + YMDH)
