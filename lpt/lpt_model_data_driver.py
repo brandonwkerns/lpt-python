@@ -274,7 +274,7 @@ def lpt_model_data_driver(dataset,plotting,output,lpo_options,lpt_options,merge_
 
             ax2.text(0.87,1.02,'(<15$\degree$S, >15$\degree$N Dashed)', transform=ax2.transAxes)
 
-            img_dir2 = (options['imgdir'] + end_time.strftime(output['sub_directory_format']))
+            img_dir2 = (options['imgdir'] + '/' + end_time.strftime(output['sub_directory_format']))
 
             os.makedirs(img_dir2, exist_ok = True)
             file_out_base = (img_dir2 + '/lpt_time_lon_' + dataset['label'] + '_' + YMDHb + '_' + YMDH)
