@@ -6,6 +6,8 @@ import datetime as dt
 from context import lpt
 import os
 import sys
+import glob
+
 
 plt.close('all')
 verbose=False
@@ -115,6 +117,17 @@ for year1 in range(year10, year11+1):
         filter_stdev = [10,8]   # Points in filter width.
         YMDH1_YMDH2='{0:d}060100_{1:d}063018'.format(year1, year1+1)
 
+    ## For WRF
+
+    elif prod == 'wrf':
+        filter='g14_72h'
+        thresh='thresh14'
+        interval_hours=1
+        accumulation_hours=72
+        filter_stdev = 14   # Points in filter width.
+        YMDH1_YMDH2='{0:d}060100_{1:d}063018'.format(year1, year1+1)
+        label='ind_20111122_ecmwf_d'
+
 
     else:
 
@@ -123,9 +136,16 @@ for year1 in range(year10, year11+1):
 
 
 
-    lpt_systems_file = ('/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data/'+prod+'/'+filter+'/'+thresh+'/systems/lpt_systems_'+prod+'_'+YMDH1_YMDH2+'.nc')
-    lpt_group_file = ('/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data/'+prod+'/'+filter+'/'+thresh+'/systems/lpt_systems_'+prod+'_'+YMDH1_YMDH2+'.group_array.txt')
-    lpt_objects_dir = ('/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data/'+prod+'/'+filter+'/'+thresh+'/objects')
+
+    if prod == 'wrf':
+        lpt_systems_file = glob.glob('/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data/'+prod+'/'+filter+'/'+thresh+'/systems/' + label + '/lpt_systems_'+prod+'_*.nc')[0]
+        lpt_group_file = glob.glob('/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data/'+prod+'/'+filter+'/'+thresh+'/systems/' + label + '/lpt_systems_'+prod+'_*.group_array.txt')[0]
+        lpt_objects_dir = ('/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data/'+prod+'/'+filter+'/'+thresh+'/objects/' + label)
+    else:
+        lpt_systems_file = ('/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data/'+prod+'/'+filter+'/'+thresh+'/systems/lpt_systems_'+prod+'_'+YMDH1_YMDH2+'.nc')
+        lpt_group_file = ('/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data/'+prod+'/'+filter+'/'+thresh+'/systems/lpt_systems_'+prod+'_'+YMDH1_YMDH2+'.group_array.txt')
+        lpt_objects_dir = ('/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data/'+prod+'/'+filter+'/'+thresh+'/objects')
+
 
     MISSING = -999.0
     FILL_VALUE = MISSING
@@ -161,7 +181,7 @@ for year1 in range(year10, year11+1):
             this_branch = int(2**(np.round( 100.0 * (this_lpt_id - this_group)) - 1))
         else:
             this_branch = int(2**(np.round( 1000.0 * (this_lpt_id - this_group)) - 1))
-            
+
         print((this_lpt_id, this_branch))
         this_branch_idx = [x for x in range(len(BRANCHES)) if LPT[x,2]==this_group and (BRANCHES[x] & this_branch) > 0] # bitwise and
         #lp_object_id_list = LPT[LPT[:,2]==this_group,1]
@@ -206,7 +226,10 @@ for year1 in range(year10, year11+1):
             else:
                 dt_idx = dt_idx[0]
 
-            fn = (lpt_objects_dir + '/' + dt_this.strftime('%Y/%m/%Y%m%d/objects_%Y%m%d%H.nc'))
+            if prod == 'wrf':
+                fn = (lpt_objects_dir + '/' + dt_this.strftime('objects_%Y%m%d%H.nc'))
+            else:
+                fn = (lpt_objects_dir + '/' + dt_this.strftime('%Y/%m/%Y%m%d/objects_%Y%m%d%H.nc'))
             if verbose:
                 print(fn)
             DS=Dataset(fn)
@@ -218,7 +241,11 @@ for year1 in range(year10, year11+1):
                 lat = DS['grid_lat'][:]
                 mask_arrays['lon'] = DS['grid_lon'][:]
                 mask_arrays['lat'] = DS['grid_lat'][:]
-                mask_arrays_shape = [len(mask_times), len(lat), len(lon)]
+                if prod == 'wrf':
+                    ny, nx = mask_arrays['lon'].shape
+                    mask_arrays_shape = [len(mask_times), ny, nx]
+                else:
+                    mask_arrays_shape = [len(mask_times), len(lat), len(lon)]
                 mask_arrays['mask_at_end_time'] = np.zeros(mask_arrays_shape)
                 mask_arrays['mask_with_filter_at_end_time'] = np.zeros(mask_arrays_shape)
                 mask_arrays['mask_with_accumulation'] = np.zeros(mask_arrays_shape)
@@ -260,18 +287,29 @@ for year1 in range(year10, year11+1):
         ##
         ## Output.
         ##
-        fn_out = ('/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data/'+prod+'/'+filter+'/'+thresh+'/systems/'+YMDH1_YMDH2+'/lpt_system_mask_'+YMDH1_YMDH2+'.lptid{0:010.4f}.nc'.format(this_lpt_id))
+        if prod == 'wrf':
+            fn_out = ('/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data/'+prod+'/'+filter+'/'+thresh+'/systems/'+label+'/lpt_system_mask_'+label+'.lptid{0:010.4f}.nc'.format(this_lpt_id))
+        else:
+            fn_out = ('/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data/'+prod+'/'+filter+'/'+thresh+'/systems/'+YMDH1_YMDH2+'/lpt_system_mask_'+YMDH1_YMDH2+'.lptid{0:010.4f}.nc'.format(this_lpt_id))
         os.makedirs('/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data/'+prod+'/'+filter+'/'+thresh+'/systems/'+YMDH1_YMDH2, exist_ok=True)
 
         print('Writing to: ' + fn_out, flush=True)
         DSnew = Dataset(fn_out, 'w', data_model='NETCDF4', clobber=True)
         DSnew.createDimension('time',len(mask_times))
-        DSnew.createDimension('lon',len(lon))
-        DSnew.createDimension('lat',len(lat))
+        if prod == 'wrf':
+            ny,nx = lon.shape
+            DSnew.createDimension('x',nx)
+            DSnew.createDimension('y',ny)
+            DSnew.createVariable('lon','f4',('y','x'))
+            DSnew.createVariable('lat','f4',('y','x'))
+        else:
+            DSnew.createDimension('lon',len(lon))
+            DSnew.createDimension('lat',len(lat))
+            DSnew.createVariable('lon','f4',('lon',))
+            DSnew.createVariable('lat','f4',('lat',))
+
 
         DSnew.createVariable('time','d',('time',)) # I would like to use u4, but ncview complains about dimension variable being unknown type.
-        DSnew.createVariable('lon','f4',('lon',))
-        DSnew.createVariable('lat','f4',('lat',))
 
         DSnew.createVariable('centroid_lon','f4',('time',),fill_value=FILL_VALUE)
         DSnew.createVariable('centroid_lat','f4',('time',),fill_value=FILL_VALUE)
@@ -297,8 +335,14 @@ for year1 in range(year10, year11+1):
         DSnew['max_running_field'].setncatts({'units':'mm day-1','long_name':'LP object running mean rain rate (at end of accum time).','note':'Time is end of running mean time.'})
 
         for mask_var in ['mask_at_end_time','mask_with_filter_at_end_time','mask_with_accumulation','mask_with_filter_and_accumulation']:
-            DSnew.createVariable(mask_var,'i',('time','lat','lon'), zlib=True, complevel=4)
-            DSnew[mask_var][:] = mask_arrays[mask_var]
-            DSnew[mask_var].setncattr('units','1')
+            if prod == 'wrf':
+                DSnew.createVariable(mask_var,'i',('time','y','x'), zlib=True, complevel=4)
+                DSnew[mask_var][:] = mask_arrays[mask_var]
+                DSnew[mask_var].setncattr('units','1')
+
+            else:
+                DSnew.createVariable(mask_var,'i',('time','lat','lon'), zlib=True, complevel=4)
+                DSnew[mask_var][:] = mask_arrays[mask_var]
+                DSnew[mask_var].setncattr('units','1')
 
         DSnew.close()
