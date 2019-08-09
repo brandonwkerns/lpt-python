@@ -90,7 +90,7 @@ def lpt_model_data_driver(dataset,plotting,output,lpo_options,lpt_options,merge_
 
             OBJ = lpt.helpers.calculate_lp_object_properties(DATA_RAW1['lon'], DATA_RAW1['lat']
                         , DATA_RAW1['precip'], DATA_RUNNING, DATA_FILTERED, label_im, 0
-                        , end_of_accumulation_time, verbose=True)
+                        , end_of_accumulation_time0, verbose=True)
             OBJ['units_inst'] = 'mm h-1'
             OBJ['units_running'] = 'mm day-1'
             OBJ['units_filtered'] = 'mm day-1'
@@ -192,6 +192,7 @@ def lpt_model_data_driver(dataset,plotting,output,lpo_options,lpt_options,merge_
 
         ## Overlap forward and backward connections.
         LPTfb, BRANCHESfb = lpt.helpers.overlap_forward_backward(LPTf, LPTb, BRANCHESf, BRANCHESb, options, verbose=True)
+
 
         ## Allow center jumps.
         print(('Allow center jumps up to ' + str(options['center_jump_max_hours']) + ' hours.'))
