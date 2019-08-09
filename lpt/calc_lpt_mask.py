@@ -122,12 +122,12 @@ for year1 in range(year10, year11+1):
 
     elif prod == 'wrf':
         filter='g14_72h'
-        thresh='thresh14'
+        thresh='thresh11'
         interval_hours=1
         accumulation_hours=72
         filter_stdev = 14   # Points in filter width.
         YMDH1_YMDH2='{0:d}060100_{1:d}063018'.format(year1, year1+1)
-        label='ind_20111122_ecmwf_d'
+        label='ind_20111122_ecmwf_p'
 
 
     else:
@@ -185,7 +185,6 @@ for year1 in range(year10, year11+1):
 
         print((this_lpt_id, this_branch))
         this_branch_idx = [x for x in range(len(BRANCHES)) if LPT[x,2]==this_group and (BRANCHES[x] & this_branch) > 0] # bitwise and
-        #lp_object_id_list = LPT[LPT[:,2]==this_group,1]
         lp_object_id_list = LPT[this_branch_idx,1]
 
 
@@ -318,14 +317,12 @@ for year1 in range(year10, year11+1):
         DSnew.createVariable('max_running_field','f4',('time',),fill_value=FILL_VALUE)
 
         ts = [(x - dt.datetime(1970,1,1,0,0,0)).total_seconds()/3600.0 for x in mask_times]
-        print(ts[0:4])
         DSnew['time'][:] = ts
         DSnew['time'].setncattr('units','hours since 1970-1-1 0:0:0')
         DSnew['lon'][:] = lon
         DSnew['lon'].setncattr('units','degrees_east')
         DSnew['lat'][:] = lat
         DSnew['lat'].setncattr('units','degrees_north')
-
 
         for mask_var in ['centroid_lon','centroid_lat','area','max_running_field']:
             DSnew[mask_var][:] = mask_arrays[mask_var]
