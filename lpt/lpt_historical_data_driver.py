@@ -209,8 +209,8 @@ def lpt_historical_data_driver(dataset,plotting,output,lpo_options,lpt_options,m
             BRANCHES = BRANCHES_remove_short.copy()
 
 
-        BRANCHES = lpt.helpers.reorder_LPT_branches(LPT, BRANCHES)
-        print(str(BRANCHES))
+        #BRANCHES = lpt.helpers.reorder_LPT_branches(LPT, BRANCHES)
+        #print(str(BRANCHES))
 
         ## Get "timeclusters" tracks.
         print('Calculating LPT properties.')
