@@ -28,6 +28,7 @@ if len(sys.argv) < 4:
 else:
     prod = sys.argv[3]
 
+data_dir = '/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data'
 
 ################################################################################
 
@@ -138,13 +139,13 @@ for year1 in range(year10, year11+1):
 
 
     if prod == 'wrf':
-        lpt_systems_file = glob.glob('/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data/'+prod+'/'+filter+'/'+thresh+'/systems/' + label + '/lpt_systems_'+prod+'_*.nc')[0]
-        lpt_group_file = glob.glob('/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data/'+prod+'/'+filter+'/'+thresh+'/systems/' + label + '/lpt_systems_'+prod+'_*.group_array.txt')[0]
-        lpt_objects_dir = ('/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data/'+prod+'/'+filter+'/'+thresh+'/objects/' + label)
+        lpt_systems_file = glob.glob(data_dir + '/'+prod+'/'+filter+'/'+thresh+'/systems/' + label + '/lpt_systems_'+prod+'_*.nc')[0]
+        lpt_group_file = glob.glob(data_dir + '/'+prod+'/'+filter+'/'+thresh+'/systems/' + label + '/lpt_systems_'+prod+'_*.group_array.txt')[0]
+        lpt_objects_dir = (data_dir + '/'+prod+'/'+filter+'/'+thresh+'/objects/' + label)
     else:
-        lpt_systems_file = ('/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data/'+prod+'/'+filter+'/'+thresh+'/systems/lpt_systems_'+prod+'_'+YMDH1_YMDH2+'.nc')
-        lpt_group_file = ('/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data/'+prod+'/'+filter+'/'+thresh+'/systems/lpt_systems_'+prod+'_'+YMDH1_YMDH2+'.group_array.txt')
-        lpt_objects_dir = ('/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data/'+prod+'/'+filter+'/'+thresh+'/objects')
+        lpt_systems_file = (data_dir + '/'+prod+'/'+filter+'/'+thresh+'/systems/lpt_systems_'+prod+'_'+YMDH1_YMDH2+'.nc')
+        lpt_group_file = (data_dir + '/'+prod+'/'+filter+'/'+thresh+'/systems/lpt_systems_'+prod+'_'+YMDH1_YMDH2+'.group_array.txt')
+        lpt_objects_dir = (data_dir + '/'+prod+'/'+filter+'/'+thresh+'/objects')
 
 
     MISSING = -999.0
@@ -288,10 +289,10 @@ for year1 in range(year10, year11+1):
         ## Output.
         ##
         if prod == 'wrf':
-            fn_out = ('/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data/'+prod+'/'+filter+'/'+thresh+'/systems/'+label+'/lpt_system_mask_'+label+'.lptid{0:010.4f}.nc'.format(this_lpt_id))
+            fn_out = (data_dir + '/'+prod+'/'+filter+'/'+thresh+'/systems/'+label+'/lpt_system_mask_'+label+'.lptid{0:010.4f}.nc'.format(this_lpt_id))
         else:
-            fn_out = ('/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data/'+prod+'/'+filter+'/'+thresh+'/systems/'+YMDH1_YMDH2+'/lpt_system_mask_'+YMDH1_YMDH2+'.lptid{0:010.4f}.nc'.format(this_lpt_id))
-        os.makedirs('/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data/'+prod+'/'+filter+'/'+thresh+'/systems/'+YMDH1_YMDH2, exist_ok=True)
+            fn_out = (data_dir + '/'+prod+'/'+filter+'/'+thresh+'/systems/'+YMDH1_YMDH2+'/lpt_system_mask_'+YMDH1_YMDH2+'.lptid{0:010.4f}.nc'.format(this_lpt_id))
+        os.makedirs(data_dir + '/'+prod+'/'+filter+'/'+thresh+'/systems/'+YMDH1_YMDH2, exist_ok=True)
 
         print('Writing to: ' + fn_out, flush=True)
         DSnew = Dataset(fn_out, 'w', data_model='NETCDF4', clobber=True)
