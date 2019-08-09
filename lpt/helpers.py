@@ -290,6 +290,7 @@ def init_lpt_group_array(dt_list, objdir, fmt = "/%Y/%m/%Y%m%d/objects_%Y%m%d%H.
             try:
                 id_list = DS['objid'][:]
             except IndexError:
+                print('WARNING: No LPO at this time: ' + str(this_dt))
                 id_list = [] # In case of no LPOs at this time.
             DS.close()
 
@@ -626,6 +627,9 @@ def lpt_group_id_separate_branches(LPT, BRANCHES, options, verbose=True, fmt="/%
     ##########################################################
     ## Overlapping branches stuff.
     ## Using the "brute force" method of going through time stamp by time stamp.
+    ## Starting from each "Begin Node" and ending up at a "End Node".
+    ## At "Split" nodes, take the left track and flag that LPO so it is not followed again,
+    ##   then the next iteration takes the right track.
     ##########################################################
 
     LPT3 = LPT.copy()
@@ -651,10 +655,19 @@ def lpt_group_id_separate_branches(LPT, BRANCHES, options, verbose=True, fmt="/%
 
             ## Iterate until I have connected this initial node point
             ##   with each of the ending node points.
-            more_to_do = True # If I find a split, then there is more to do for this starting node.
+            more_to_do = True # Set this to True to make sure I go forward at least once.
+                              # Below, if I find a split, then there is more to do for this starting node.
                               # (mergers are handled as separate starting nodes.)
             already_matched_indices = [] # Keep track of which indices have already been assigned a branch.
+                                         # This effectively "blocks" branches that I have already done,
+                                         # From the left to the right.
             niter = 0
+
+
+            ##
+            ## Go from left to right at splits.
+            ##
+
             while more_to_do:
                 more_to_do = False
                 niter += 1
@@ -668,16 +681,14 @@ def lpt_group_id_separate_branches(LPT, BRANCHES, options, verbose=True, fmt="/%
 
                 prev_objid = LPT3[begin_idx,1]
 
-                for this_time_stamp in this_lpt_time_stamps_all:
+                for this_time_stamp in this_lpt_time_stamps_all: ## This is the big time loop.
                     if this_time_stamp > LPT3[begin_idx,0] + 0.01:
 
                         ## Looping forward in time. search for matches with previous branches.
                         lpt_indices_at_this_time = np.where(np.logical_and(LPT3[:,2] == this_lpt_group, LPT3[:,0] == this_time_stamp))[0]
                         matches_this_branch = 0 * lpt_indices_at_this_time
 
-
                         lpt_indices_at_this_time_matches = []
-
 
                         for ii in range(len(lpt_indices_at_this_time)):
                             this_objid = LPT3[lpt_indices_at_this_time[ii],1]
@@ -698,7 +709,7 @@ def lpt_group_id_separate_branches(LPT, BRANCHES, options, verbose=True, fmt="/%
                         if len(lpt_indices_at_this_time_matches) < 1:
                             continue # Should only happen if it is a center jump situation.
 
-                        #print('lpt_indices_at_this_time_matches = ' + str(lpt_indices_at_this_time_matches))
+                        #print((str(this_time_stamp), ' lpt_indices_at_this_time_matches = ' + str(lpt_indices_at_this_time_matches)))
                         move_forward_idx = lpt_indices_at_this_time_matches[0] # Always take the first (e.g., leftmost) available direction.
                                                                                # The others will get done in subsequent iterations.
 
@@ -725,10 +736,89 @@ def lpt_group_id_separate_branches(LPT, BRANCHES, options, verbose=True, fmt="/%
                         if LPT3[move_forward_idx,4] == 1:
                             break
 
+            ##
+            ## Now, go from right to left at splits.
+            ## This will usually generate duplicate branches, which are removed below.
+            ## However, for cases that split and re-combine more than once,
+            ##   it will help to capture all the possible branches.
+            ##
+            more_to_do = True
+            already_matched_indices = []
+            while more_to_do:
+                more_to_do = False
+                niter += 1
+
+                ## Seed a new branch.
+                BRANCHES3[begin_idx] = BRANCHES3[begin_idx] | 2**next_new_branch # Bitwise or
+
+                current_branch = 1 * next_new_branch # Make sure assignment is by value.
+                next_new_branch += 1
+                print("-- Branch #" + str(next_new_branch))
+
+                prev_objid = LPT3[begin_idx,1]
+
+                for this_time_stamp in this_lpt_time_stamps_all: ## This is the big time loop.
+                    if this_time_stamp > LPT3[begin_idx,0] + 0.01:
+
+                        ## Looping forward in time. search for matches with previous branches.
+                        lpt_indices_at_this_time = np.where(np.logical_and(LPT3[:,2] == this_lpt_group, LPT3[:,0] == this_time_stamp))[0]
+                        matches_this_branch = 0 * lpt_indices_at_this_time
+
+                        lpt_indices_at_this_time_matches = []
+
+                        for ii in range(len(lpt_indices_at_this_time)):
+                            this_objid = LPT3[lpt_indices_at_this_time[ii],1]
+                            n_this, n_prev, n_overlap = calc_overlapping_points(this_objid,prev_objid,options['objdir'], fmt=fmt)
+                            match = False
+                            if n_overlap >= options['min_overlap_points']:
+                                match = True
+                            if 1.0*n_overlap/n_this > options['min_overlap_frac']:
+                                match = True
+                            if 1.0*n_overlap/n_prev > options['min_overlap_frac']:
+                                match = True
+
+                            if match:
+                                matches_this_branch[ii] = 1 # I should always find at least 1 match here.
+                                if not lpt_indices_at_this_time[ii] in already_matched_indices:
+                                    lpt_indices_at_this_time_matches.append(lpt_indices_at_this_time[ii])
+
+                        if len(lpt_indices_at_this_time_matches) < 1:
+                            continue # Should only happen if it is a center jump situation.
+
+                        #print((str(this_time_stamp), ' lpt_indices_at_this_time_matches = ' + str(lpt_indices_at_this_time_matches)))
+                        move_forward_idx = lpt_indices_at_this_time_matches[-1] # Always take the last (e.g., rightmost) available direction.
+                                                                               # The others will get done in subsequent iterations.
+
+                        BRANCHES3[move_forward_idx] = BRANCHES3[move_forward_idx] | int(2**current_branch) # Bitwise or
+                        ## In case the first entry in the group is a split point.
+                        #prev_idx = 1 * move_forward_idx  # HACK -- to get MERRA2 2003 to run through. It has a split at the initial time!
+
+
+                        ## If I hit splitting node, take this branch out of "already matched indices".
+                        if len(lpt_indices_at_this_time_matches) > 1 and LPT3[prev_idx,5] >= 1:
+                            idx_with_this_branch = [ x for x in this_lpt_group_idx_all if BRANCHES3[x] & int(2**current_branch) ]
+                            for kk in idx_with_this_branch:
+                                if kk in already_matched_indices:
+                                    already_matched_indices.remove(kk)
+                            more_to_do = True
+
+                        if len(lpt_indices_at_this_time_matches) > 1:
+                            already_matched_indices.append(move_forward_idx)
+
+                        prev_objid = 1 * LPT3[move_forward_idx,1]
+                        prev_idx = 1 * move_forward_idx
+
+                        ## Break out of TIME loop if I have found an end node point.
+                        if LPT3[move_forward_idx,4] == 1:
+                            break
+
+
+
 
                 #if niter > 0:
                 #    more_to_do = False
                 #print(more_to_do)
+    BRANCHES3 = remove_duplicate_branches(LPT3, BRANCHES3)
 
     return (LPT3, BRANCHES3)
 
@@ -896,6 +986,7 @@ def lpt_split_and_merge(LPT0, BRANCHES0, merge_split_options):
                 for this_branch in branch_list_sorted:
 
                     #Which branch do you have the most intersection with?
+                    """
                     other_branch = -1
                     max_intersect_duration = -1
                     for other_branch_test in branch_list_sorted:
@@ -908,7 +999,14 @@ def lpt_split_and_merge(LPT0, BRANCHES0, merge_split_options):
                             max_intersect_duration = len(intersection_with_other_branch_test)
                             other_branch = other_branch_test
 
-                    if max_intersect_duration > 0:
+
+                    """
+                    #if max_intersect_duration > 0:
+
+                    for other_branch in branch_list_sorted:
+
+                        if this_branch == other_branch:
+                            continue
 
                         print(str(this_branch) + ' with ' + str(other_branch) + '.')
 
@@ -933,6 +1031,7 @@ def lpt_split_and_merge(LPT0, BRANCHES0, merge_split_options):
                             continue
 
                         lpt_diff1 = lpt_branches_difference(LPT, BRANCHES, this_group, this_branch, other_branch)
+                        print(lpt_diff1)
                         if len(lpt_diff1) > 0:
 
                             dt1_list = sorted(np.unique([get_objid_datetime(LPT[xx,1]) for xx in lpt_diff1]))
@@ -947,6 +1046,7 @@ def lpt_split_and_merge(LPT0, BRANCHES0, merge_split_options):
                             dur1 = 0.0
 
                         lpt_diff2 = lpt_branches_difference(LPT, BRANCHES, this_group, other_branch, this_branch)
+                        print(lpt_diff2)
                         if len(lpt_diff2) > 0:
 
                             dt2_list = sorted(np.unique([get_objid_datetime(LPT[xx,1]) for xx in lpt_diff2]))
@@ -990,14 +1090,20 @@ def lpt_split_and_merge(LPT0, BRANCHES0, merge_split_options):
                                 # Assign those LPT group array indices to the larger branch.
 
                                 for jj in lpt_diff2:
+                                    BRANCHES[jj] = BRANCHES[jj] | 2**(other_branch - 1)
+                                for jj in lpt_diff1:
+                                    BRANCHES[jj] = BRANCHES[jj] | 2**(this_branch - 1)
+
+                                    """
                                     for kk in lpt_diff1:
                                         ## Only "inherit" larger branches for the relevant time span.
                                         kkdt = get_objid_datetime(LPT[kk,1])
                                         if kkdt >= dt2_begin and kkdt <= dt2_end:
                                             BRANCHES[jj] = BRANCHES[jj] | BRANCHES[kk]
                                             BRANCHES[kk] = BRANCHES[jj] | BRANCHES[kk]
-
+                                    """
                                 more_to_do = True
+                                break
 
                     if more_to_do:
                         #more_to_do = False
@@ -1016,6 +1122,7 @@ def lpt_split_and_merge(LPT0, BRANCHES0, merge_split_options):
         print('------------------------------------------------', flush=True)
 
         more_to_do = True
+        #more_to_do = False     ## Use this to test turning off "rejoin 2."
 
         while more_to_do:
             more_to_do = False
@@ -1222,7 +1329,7 @@ def remove_short_lived_systems(LPT, BRANCHES, minimum_duration_hours, latest_dat
     But only up to the latest_datetime.
     """
 
-    latest_timestamp = latest_datetime.timestamp()
+    latest_timestamp = (latest_datetime - dt.datetime(1970,1,1,0,0,0)).total_seconds()   # .timestamp()
     unique_lpt_groups = np.unique(LPT[:,2])
     lpt_indices_to_keep = np.array([])
 
