@@ -129,14 +129,10 @@ for year1 in range(year10, year11+1):
         YMDH1_YMDH2='{0:d}060100_{1:d}063018'.format(year1, year1+1)
         label='ind_20111122_ecmwf_p'
 
-
     else:
 
         print('Product ' + prod + ' is not valid!')
         break
-
-
-
 
     if prod == 'wrf':
         lpt_systems_file = glob.glob(data_dir + '/'+prod+'/'+filter+'/'+thresh+'/systems/' + label + '/lpt_systems_'+prod+'_*.nc')[0]
@@ -163,7 +159,10 @@ for year1 in range(year10, year11+1):
     TC['centroid_lon'] = DS['centroid_lon_stitched'][:]
     TC['centroid_lat'] = DS['centroid_lat_stitched'][:]
     TC['area'] = DS['area_stitched'][:]
-    TC['max_running_field'] = DS['max_running_field'][:]
+    for var in ['max_filtered_running_field','max_running_field','max_inst_field'
+                ,'min_filtered_running_field','min_running_field','min_inst_field'
+                ,'amean_filtered_running_field','amean_running_field','amean_inst_field']:
+        TC[var] = DS[var][:]
     DS.close()
 
 
@@ -197,15 +196,20 @@ for year1 in range(year10, year11+1):
 
         ## Include some basic LPT info for user friendliness.
         lptidx = [ii for ii in range(len(TC['lptid'])) if this_lpt_id == TC['lptid'][ii]][0]
-        for var in ['centroid_lon','centroid_lat','area','max_running_field']:
+        for var in ['centroid_lon','centroid_lat','area'
+                    ,'max_filtered_running_field','max_running_field','max_inst_field'
+                    ,'min_filtered_running_field','min_running_field','min_inst_field'
+                    ,'amean_filtered_running_field','amean_running_field','amean_inst_field']:
             mask_arrays[var] = MISSING * np.ones(len(mask_times))
 
         for ttt in range(TC['i1'][lptidx],TC['i2'][lptidx]+1):
             this_time_indx = [ii for ii in range(len(mask_times)) if TC['datetime'][ttt] == mask_times[ii]]
             if len(this_time_indx) > 0:
-                for var in ['centroid_lon','centroid_lat','area','max_running_field']:
+                for var in ['centroid_lon','centroid_lat','area'
+                    ,'max_filtered_running_field','max_running_field','max_inst_field'
+                    ,'min_filtered_running_field','min_running_field','min_inst_field'
+                    ,'amean_filtered_running_field','amean_running_field','amean_inst_field']:
                     mask_arrays[var][this_time_indx] = TC[var][ttt]
-
 
         for lp_object_id in lp_object_id_list:
 
@@ -314,7 +318,11 @@ for year1 in range(year10, year11+1):
         DSnew.createVariable('centroid_lon','f4',('time',),fill_value=FILL_VALUE)
         DSnew.createVariable('centroid_lat','f4',('time',),fill_value=FILL_VALUE)
         DSnew.createVariable('area','d',('time',),fill_value=FILL_VALUE)
-        DSnew.createVariable('max_running_field','f4',('time',),fill_value=FILL_VALUE)
+
+        for var in ['max_filtered_running_field','max_running_field','max_inst_field'
+                    ,'min_filtered_running_field','min_running_field','min_inst_field'
+                    ,'amean_filtered_running_field','amean_running_field','amean_inst_field']:
+            DSnew.createVariable(var,'f4',('time',),fill_value=FILL_VALUE)
 
         ts = [(x - dt.datetime(1970,1,1,0,0,0)).total_seconds()/3600.0 for x in mask_times]
         DSnew['time'][:] = ts
@@ -324,13 +332,19 @@ for year1 in range(year10, year11+1):
         DSnew['lat'][:] = lat
         DSnew['lat'].setncattr('units','degrees_north')
 
-        for mask_var in ['centroid_lon','centroid_lat','area','max_running_field']:
+        for mask_var in ['centroid_lon','centroid_lat','area'
+                    ,'max_filtered_running_field','max_running_field','max_inst_field'
+                    ,'min_filtered_running_field','min_running_field','min_inst_field'
+                    ,'amean_filtered_running_field','amean_running_field','amean_inst_field']:
             DSnew[mask_var][:] = mask_arrays[mask_var]
 
         DSnew['centroid_lon'].setncatts({'units':'degrees_east','long_name':'centroid longitude (0-360)','standard_name':'longitude','note':'Time is end of running mean time.'})
         DSnew['centroid_lat'].setncatts({'units':'degrees_east','long_name':'centroid latitude (-90-00)','standard_name':'latitude','note':'Time is end of running mean time.'})
         DSnew['area'].setncatts({'units':'km2','long_name':'LPT System enclosed area','note':'Time is end of running mean time.'})
-        DSnew['max_running_field'].setncatts({'units':'mm day-1','long_name':'LP object running mean rain rate (at end of accum time).','note':'Time is end of running mean time.'})
+        for var in ['max_filtered_running_field','max_running_field','max_inst_field'
+                    ,'min_filtered_running_field','min_running_field','min_inst_field'
+                    ,'amean_filtered_running_field','amean_running_field','amean_inst_field']:
+            DSnew[var].setncatts({'units':'mm day-1','long_name':'LP object running mean rain rate (at end of accum time).','note':'Time is end of running mean time.'})
 
         for mask_var in ['mask_at_end_time','mask_with_filter_at_end_time','mask_with_accumulation','mask_with_filter_and_accumulation']:
             if prod == 'wrf':
