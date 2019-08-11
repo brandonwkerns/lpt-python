@@ -8,7 +8,103 @@ import os
 import matplotlib.colors as colors
 import scipy.ndimage
 
-## This driver script is for historical analysis between two times specified on command line.
+################################################################################
+## +++ Preserve the MASTER script (for Git), make local copies) and edit/run those. +++
+##
+## This driver script is for any generic NetCDF data in the proper format
+## Using the data for the two times specified on command line.
+## The file name convention of the NetCDF data is: gridded_rain_rates_YYYYMMDDHH.nc
+## The NetCDF must be in the following format template to work with this script:
+##
+## netcdf gridded_rain_rates_YYYYMMDDHH {
+## dimensions:
+## 	  lon = NNN ;
+## 	  lat = MMM ;
+## 	  time = UNLIMITED ; // (1 currently)
+## variables:
+## 	  double lon(lon) ;
+## 	  double lat(lat) ;
+## 	  double time(time) ;
+## 	   	  time:units = "hours since 1970-1-1 0:0:0" ;
+## 	  double rain(time, lat, lon) ;
+## 		  rain:units = "mm h-1" ;
+##
+## Where NNN and MMM are the longitude and latitude array sizes.
+################################################################################
+
+"""
+Dataset Case Settings
+"""
+dataset={}
+dataset['label'] = 'tmpa'
+dataset['raw_data_parent_dir'] = '/home/orca/data/model_anal/cfsr/rain_accum/'
+dataset['sub_directory_format'] = '%Y'
+dataset['data_time_interval'] = 3           # Time resolution of the data in hours.
+dataset['read_function'] = lpt.readdata.read_tmpa_at_datetime
+dataset['verbose'] = True
+
+"""
+Main settings for lpt
+"""
+## Plot settings.
+plotting = {}
+plotting['do_plotting'] = True               # True or False -- Should I make plots?
+plotting['plot_area'] = [0, 360, -50, 50]   # Plotting area for maps.
+plotting['time_lon_range'] = [40, 200]       # Longitude Range for time-longitude plots.
+
+## High level output directories. Images and data will go in here.
+output={}
+output['img_dir'] = '/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/images'
+output['data_dir'] = '/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data'
+output['sub_directory_format'] = '%Y/%m/%Y%m%d'
+
+## LP Object settings
+lpo_options={}
+#lpo_options['do_lpo_calc'] = True
+lpo_options['do_lpo_calc'] = False
+lpo_options['thresh'] = 12.0                 # LP Objects threshold
+lpo_options['accumulation_hours'] = 72       # Accumulation period for LP objects.
+lpo_options['filter_stdev'] = 20             # Gaussian filter width, in terms of grid points.
+
+## LPT Settings
+lpt_options={}
+#lpt_options['do_lpt_calc'] = False
+lpt_options['do_lpt_calc'] = True
+lpt_options['min_overlap_points'] = 1600      # LP object connectivity is based on points
+lpt_options['min_overlap_frac'] = 0.5         # -- OR fraction of either LP object.
+lpt_options['min_lp_objects_points'] = 400    # Disregard LP objects smaller than this.
+lpt_options['min_lpt_duration_hours'] = 7*24  # Minumum duration to keep it as an LPT
+lpt_options['center_jump_max_hours'] = 3*24   # How long to allow center jumps
+
+## Merging/Splitting settings
+merge_split_options={}
+merge_split_options['allow_merge_split'] = True
+#merge_split_options['allow_merge_split'] = False
+merge_split_options['split_merger_min_hours'] = 72     # Min duration of a split/merging track to separate it.
+
+"""
+Call the real time driver function.
+"""
+
+lpt_historical_data_driver(dataset,plotting,output,lpo_options,lpt_options, merge_split_options, sys.argv)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def filter_str(stdev):
     if type(stdev) == int:
@@ -203,13 +299,13 @@ def lpt_historical_data_driver(dataset,plotting,output,lpo_options,lpt_options,m
         ## Handle splitting and merging, if specified.
         if merge_split_options['allow_merge_split']:
             LPT, BRANCHES = lpt.helpers.lpt_group_id_separate_branches(LPT_remove_short, BRANCHES_remove_short, options, verbose=True)
-            LPT, BRANCHES = lpt.helpers.lpt_split_and_merge(LPT, BRANCHES, merge_split_options, options)
+            LPT, BRANCHES = lpt.helpers.lpt_split_and_merge(LPT, BRANCHES, merge_split_options)
         else:
             LPT = LPT_remove_short.copy()
             BRANCHES = BRANCHES_remove_short.copy()
 
 
-        BRANCHES = lpt.helpers.reorder_LPT_branches(LPT, BRANCHES)
+        #BRANCHES = lpt.helpers.reorder_LPT_branches(LPT, BRANCHES)
         #print(str(BRANCHES))
 
         ## Get "timeclusters" tracks.

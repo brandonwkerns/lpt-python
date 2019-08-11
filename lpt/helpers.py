@@ -39,7 +39,7 @@ def calc_scaled_average(data_in_accumulation_period, factor):
     return factor * np.nanmean(data_in_accumulation_period, axis=0)
 
 
-def identify_lp_objects(field, threshold
+def identify_lp_objects(field, threshold, min_points=1
                         , object_is_gt_threshold=True, verbose=False):
 
     """
@@ -62,6 +62,17 @@ def identify_lp_objects(field, threshold
     label_im, nb_labels = ndimage.label(field_bw)
     if verbose:
         print('Found '+str(nb_labels)+' objects.', flush=True) # how many regions?
+
+    label_points = ndimage.sum(1, label_im, range(nb_labels+1))
+    print(str(label_points))
+
+    throw_away = [x for x in range(1, nb_labels+1) if label_points[x] < min_points]
+
+    if len(throw_away) > 0:
+        if verbose:
+            print('Discarding ' + str(len(throw_away)) + ' features that were < ' + str(min_points) + ' points.')
+        label_im = np.array([[x if not x in throw_away else 0 for x in y] for y in label_im])
+        ## TODO: Re-order LP Object IDs.
 
     return label_im
 
@@ -930,7 +941,7 @@ def lpt_branches_intersection(LPT, BRANCHES, group_id, branch_id_int1, branch_id
 
 
 
-def lpt_split_and_merge(LPT0, BRANCHES0, merge_split_options):
+def lpt_split_and_merge(LPT0, BRANCHES0, merge_split_options, options, fmt="/%Y/%m/%Y%m%d/objects_%Y%m%d%H.nc"):
 
     LPT = LPT0.copy()
     BRANCHES = BRANCHES0.copy()
@@ -984,25 +995,6 @@ def lpt_split_and_merge(LPT0, BRANCHES0, merge_split_options):
                 print("Sorted branch list: " + str(branch_list_sorted))
 
                 for this_branch in branch_list_sorted:
-
-                    #Which branch do you have the most intersection with?
-                    """
-                    other_branch = -1
-                    max_intersect_duration = -1
-                    for other_branch_test in branch_list_sorted:
-
-                        if this_branch == other_branch_test:
-                            continue
-
-                        intersection_with_other_branch_test = lpt_branches_intersection(LPT,  BRANCHES, this_group, this_branch, other_branch_test)
-                        if len(intersection_with_other_branch_test) > max_intersect_duration:
-                            max_intersect_duration = len(intersection_with_other_branch_test)
-                            other_branch = other_branch_test
-
-
-                    """
-                    #if max_intersect_duration > 0:
-
                     for other_branch in branch_list_sorted:
 
                         if this_branch == other_branch:
@@ -1174,7 +1166,8 @@ def lpt_split_and_merge(LPT0, BRANCHES0, merge_split_options):
                             other_branch = other_branch_test
 
                     if max_intersect_duration > 0:
-
+                        ## OK, These branches have an intersection.
+                        ## So we need to figure out whether to both of them, or only one of them.
                         print(str(this_branch) + ' with ' + str(other_branch) + '.')
 
                         lpt_all1 = lpt_branches_indices_list(LPT,  BRANCHES, this_group, this_branch)
@@ -1196,6 +1189,8 @@ def lpt_split_and_merge(LPT0, BRANCHES0, merge_split_options):
                         if len(lpt_diff1) > 0:
 
                             print('Diff1: ' + str(lpt_diff1))
+                            ## Area accumulate in time
+                            area1_sum = np.sum(np.array([read_lp_object_properties(LPT[xx,1],options['objdir'], ['area'], fmt=fmt)['area'] for xx in lpt_diff1]))
                             dt1_list = sorted(np.unique([get_objid_datetime(LPT[xx,1]) for xx in lpt_diff1]))
                             dt1_begin = dt1_list[0]
                             dt1_end = dt1_list[-1] #get_objid_datetime(LPT[np.max(lpt_diff1),1])
@@ -1210,6 +1205,8 @@ def lpt_split_and_merge(LPT0, BRANCHES0, merge_split_options):
                         lpt_diff2 = lpt_branches_difference(LPT, BRANCHES, this_group, other_branch, this_branch)
                         if len(lpt_diff2) > 0:
                             print('Diff2: ' + str(lpt_diff2))
+                            ## Area accumulate in time
+                            area2_sum = np.sum(np.array([read_lp_object_properties(LPT[xx,1],options['objdir'], ['area'], fmt=fmt)['area'] for xx in lpt_diff2]))
                             dt2_list = sorted(np.unique([get_objid_datetime(LPT[xx,1]) for xx in lpt_diff2]))
                             dt2_begin = dt2_list[0]
                             dt2_end = dt2_list[-1] #get_objid_datetime(LPT[np.max(lpt_diff1),1])
@@ -1240,7 +1237,51 @@ def lpt_split_and_merge(LPT0, BRANCHES0, merge_split_options):
                             print("Merger or Split.")
                             if min(dur1,dur2) > merge_split_options['split_merger_min_hours'] + 0.1:
                                 print("--> Retain both branches.")
+                                print((area1_sum, area2_sum))
                             else:
+
+
+                                print("--> Remove the smaller LPT branch.")
+                                #if dur1 > dur2:  # TODO: This should be based on area times duration.
+                                if area1_sum > area2_sum:
+                                    print('1 > 2')
+
+                                    # Remove the smaller branch.
+                                    branches_to_remove = get_group_branches_as_list(BRANCHES[lpt_diff2[0]])
+                                    for branch_to_remove in branches_to_remove:
+                                        LPT, BRANCHES = remove_branch_from_group(LPT, BRANCHES, this_group, branch_to_remove)
+
+                                    # Assign those LPT group array indices to the larger branch.
+                                    """
+                                    for jj in lpt_diff2:
+                                        for kk in lpt_diff1:
+                                            ## Only "inherit" larger branches for the relevant time span.
+                                            kkdt = get_objid_datetime(LPT[kk,1])
+                                            if kkdt >= dt2_begin and kkdt <= dt2_end:
+                                                BRANCHES[jj] = BRANCHES[jj] | BRANCHES[kk]
+                                    """
+                                else:
+
+                                    print('2 > 1')
+
+                                    # Remove the smaller branch.
+                                    branches_to_remove = get_group_branches_as_list(BRANCHES[lpt_diff1[0]])
+                                    for branch_to_remove in branches_to_remove:
+                                        LPT, BRANCHES = remove_branch_from_group(LPT, BRANCHES, this_group, branch_to_remove)
+
+                                    # Assign those LPT group array indices to the larger branch.
+                                    """
+                                    for jj in lpt_diff1:
+                                        for kk in lpt_diff2:
+                                            ## Only "inherit" larger branches for the relevant time span.
+                                            kkdt = get_objid_datetime(LPT[kk,1])
+                                            if kkdt >= dt1_begin and kkdt <= dt1_end:
+                                                BRANCHES[jj] = BRANCHES[jj] | BRANCHES[kk]
+                                    """
+
+
+
+                                """
                                 print("--> Combine these LPT branches.")
                                 if dur1 > dur2:
 
@@ -1275,6 +1316,8 @@ def lpt_split_and_merge(LPT0, BRANCHES0, merge_split_options):
                                             kkdt = get_objid_datetime(LPT[kk,1])
                                             if kkdt >= dt1_begin and kkdt <= dt1_end:
                                                 BRANCHES[jj] = BRANCHES[jj] | BRANCHES[kk]
+                                """
+
 
                                 more_to_do = True
                                 break

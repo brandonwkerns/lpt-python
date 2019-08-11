@@ -1,14 +1,17 @@
 import matplotlib; matplotlib.use('agg')
 import numpy as np
 from context import lpt
-import matplotlib.pylab as plt
+import matplotlib.pyplot as plt
 import datetime as dt
 import sys
 import os
 import matplotlib.colors as colors
 import scipy.ndimage
+from netCDF4 import Dataset
 
-## This driver script is for historical analysis between two times specified on command line.
+################################################################################
+## These functions are used by lpt_generic_netcdf_data_driver.py
+################################################################################
 
 def filter_str(stdev):
     if type(stdev) == int:
@@ -21,13 +24,63 @@ def filter_str(stdev):
     return strout
 
 
-def lpt_historical_data_driver(dataset,plotting,output,lpo_options,lpt_options,merge_split_options,argv):
+def read_generic_netcdf(fn):
+    """
+    DATA = read_generic_netcdf(fn)
+
+    output is like this:
+    list(DATA)
+    Out[12]: ['lon', 'lat', 'precip']
+    In [21]: DATA['lon'].shape
+    Out[21]: (1440,)
+    In [22]: DATA['lat'].shape
+    Out[22]: (400,)
+    In [23]: DATA['precip'].shape
+    Out[23]: (400, 1440)
+    """
+
+    DS = Dataset(fn)
+    DATA={}
+    DATA['lon'] = DS['lon'][:]
+    DATA['lat'] = DS['lat'][:]
+    DATA['precip'] = DS['rain'][:][0]
+    DS.close()
+
+    ## Need to get from (-180, 180) to (0, 360) longitude.
+    lon_lt_0, = np.where(DATA['lon'] < -0.0001)
+    lon_ge_0, = np.where(DATA['lon'] > -0.0001)
+    if len(lon_lt_0) > 0:
+        DATA['lon'][lon_lt_0] += 360.0
+        DATA['lon'] = np.concatenate((DATA['lon'][lon_ge_0], DATA['lon'][lon_lt_0]))
+        DATA['precip'] = np.concatenate((DATA['precip'][:,lon_ge_0], DATA['precip'][:,lon_lt_0]), axis=1)
+
+    return DATA
+
+
+def read_generic_netcdf_at_datetime(dt, data_dir='.', fmt='gridded_rain_rates_%Y%m%d%H.nc', verbose=False):
+
+    fn = (data_dir + '/' + dt.strftime(fmt))
+    DATA=None
+
+    if not os.path.exists(fn):
+        print('File not found: ', fn)
+    else:
+        if verbose:
+            print(fn)
+        DATA=read_generic_netcdf(fn)
+
+    return DATA
+
+
+
+def lpt_driver(dataset,plotting,output,lpo_options,lpt_options,merge_split_options,argv):
 
     ## Get begin and end time from command line.
     ## Give warning message if it has not been specified.
 
     if len(argv) < 3:
         print('Specify begin and end time on command line, format YYYYMMDDHH.')
+        print('Example: python lpt_generic_netcdf_data_driver 2011060100 2012063021')
         return
 
     begin_time = dt.datetime.strptime(str(argv[1]), '%Y%m%d%H') # command line arg #1 format: YYYYMMDDHH
@@ -35,8 +88,6 @@ def lpt_historical_data_driver(dataset,plotting,output,lpo_options,lpt_options,m
 
     hours_list = np.arange(0.0, 0.1 +(end_time-begin_time).total_seconds()/3600.0, dataset['data_time_interval'])
     time_list = [begin_time + dt.timedelta(hours=x) for x in hours_list]
-
-
 
     if plotting['do_plotting']:
         fig1 = plt.figure(1, figsize = (8.5,4))
@@ -62,10 +113,7 @@ def lpt_historical_data_driver(dataset,plotting,output,lpo_options,lpt_options,m
                 count = 0
 
                 for this_dt in reversed(dt_list):
-                    if 'sub_area' in dataset.keys():
-                        DATA_RAW = dataset['read_function'](this_dt, verbose=dataset['verbose'], area=dataset['sub_area'])
-                    else:
-                        DATA_RAW = dataset['read_function'](this_dt, verbose=dataset['verbose'])
+                    DATA_RAW = read_generic_netcdf_at_datetime(this_dt, data_dir=dataset['raw_data_parent_dir'], fmt=dataset['file_name_format'], verbose=dataset['verbose'])
                     DATA_RAW['precip'][DATA_RAW['precip'] < -0.01] = 0.0
                     if count < 1:
                         data_collect = np.array(DATA_RAW['precip'])
@@ -78,11 +126,12 @@ def lpt_historical_data_driver(dataset,plotting,output,lpo_options,lpt_options,m
 
                 ## Filter the data
                 DATA_FILTERED = scipy.ndimage.gaussian_filter(DATA_RUNNING, lpo_options['filter_stdev']
-                    , order=0, output=None, mode='reflect', cval=0.0, truncate=3.0)
+                    , order=0, output=None, mode='reflect', cval=0.0, truncate=lpo_options['filter_n_stdev_width'])
                 print('filter done.',flush=True)
 
                 ## Get LP objects.
-                label_im = lpt.helpers.identify_lp_objects(DATA_FILTERED, lpo_options['thresh'], verbose=dataset['verbose'])
+                label_im = lpt.helpers.identify_lp_objects(DATA_FILTERED, lpo_options['thresh'], min_points=lpo_options['min_points'], verbose=dataset['verbose'])
+                #print(label_im)
                 OBJ = lpt.helpers.calculate_lp_object_properties(DATA_RAW['lon'], DATA_RAW['lat']
                             , DATA_RAW['precip'], DATA_RUNNING, DATA_FILTERED, label_im, 0
                             , end_of_accumulation_time, verbose=True)
@@ -150,8 +199,8 @@ def lpt_historical_data_driver(dataset,plotting,output,lpo_options,lpt_options,m
                     + '/' + filter_str(lpo_options['filter_stdev'])
                     + '_' + str(int(lpo_options['accumulation_hours'])) + 'h'
                     + '/thresh' + str(int(lpo_options['thresh'])) + '/systems')
-    print(options)
-    print(lpo_options)
+    #print(options)
+    #print(lpo_options)
 
     if options['do_lpt_calc']:
 
@@ -197,9 +246,6 @@ def lpt_historical_data_driver(dataset,plotting,output,lpo_options,lpt_options,m
         LPT_remove_short, BRANCHES_remove_short = lpt.helpers.remove_short_lived_systems(LPT_center_jumps, BRANCHESfb, options['min_lpt_duration_hours']
                                 , latest_datetime = latest_lp_object_time)
 
-
-
-
         ## Handle splitting and merging, if specified.
         if merge_split_options['allow_merge_split']:
             LPT, BRANCHES = lpt.helpers.lpt_group_id_separate_branches(LPT_remove_short, BRANCHES_remove_short, options, verbose=True)
@@ -209,7 +255,7 @@ def lpt_historical_data_driver(dataset,plotting,output,lpo_options,lpt_options,m
             BRANCHES = BRANCHES_remove_short.copy()
 
 
-        BRANCHES = lpt.helpers.reorder_LPT_branches(LPT, BRANCHES)
+        #BRANCHES = lpt.helpers.reorder_LPT_branches(LPT, BRANCHES)
         #print(str(BRANCHES))
 
         ## Get "timeclusters" tracks.

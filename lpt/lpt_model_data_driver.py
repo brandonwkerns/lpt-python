@@ -209,7 +209,7 @@ def lpt_model_data_driver(dataset,plotting,output,lpo_options,lpt_options,merge_
         ## Handle splitting and merging, if specified.
         if merge_split_options['allow_merge_split']:
             LPT, BRANCHES = lpt.helpers.lpt_group_id_separate_branches(LPT_remove_short, BRANCHES_remove_short, options, verbose=True, fmt = "/"+output['sub_directory_format'] + "/objects_%Y%m%d%H.nc")
-            LPT, BRANCHES = lpt.helpers.lpt_split_and_merge(LPT, BRANCHES, merge_split_options)
+            LPT, BRANCHES = lpt.helpers.lpt_split_and_merge(LPT, BRANCHES, merge_split_options, options, fmt = "/"+output['sub_directory_format'] + "/objects_%Y%m%d%H.nc")
         else:
             LPT = LPT_remove_short.copy()
             BRANCHES = BRANCHES_remove_short.copy()

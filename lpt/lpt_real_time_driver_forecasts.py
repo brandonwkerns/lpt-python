@@ -167,10 +167,6 @@ def lpt_real_time_driver_forecasts(dataset,plotting,output,lpo_options,lpt_optio
         print(('Allow center jumps up to ' + str(options['center_jump_max_hours']) + ' hours.'))
         LPT_center_jumps = lpt.helpers.lpt_group_array_allow_center_jumps(LPTfb, options, fmt=fmt)
 
-        #if merge_split_options['allow_merge_split']:
-        #    print('Doing splits and mergers.')
-        #    LPT_center_jumps = lpt.helpers.lpt_split_and_merge(LPT_center_jumps.copy(), merge_split_options)
-
         ## Eliminate short duration systems.
         print(('Remove LPT shorter than ' + str(options['min_lpt_duration_hours']) + ' hours.'))
         LPT_remove_short, BRANCHES_remove_short = lpt.helpers.remove_short_lived_systems(LPT_center_jumps, BRANCHESfb, options['min_lpt_duration_hours']
@@ -181,7 +177,7 @@ def lpt_real_time_driver_forecasts(dataset,plotting,output,lpo_options,lpt_optio
         ## Handle splitting and merging, if specified.
         if merge_split_options['allow_merge_split']:
             LPT, BRANCHES = lpt.helpers.lpt_group_id_separate_branches(LPT_remove_short, BRANCHES_remove_short, options, verbose=True, fmt=fmt)
-            LPT, BRANCHES = lpt.helpers.lpt_split_and_merge(LPT, BRANCHES, merge_split_options)
+            LPT, BRANCHES = lpt.helpers.lpt_split_and_merge(LPT, BRANCHES, merge_split_options, options)
         else:
             LPT = LPT_remove_short.copy()
             BRANCHES = BRANCHES_remove_short.copy()

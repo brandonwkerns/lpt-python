@@ -157,10 +157,6 @@ def lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,merge_s
         print(('Allow center jumps up to ' + str(options['center_jump_max_hours']) + ' hours.'))
         LPT_center_jumps = lpt.helpers.lpt_group_array_allow_center_jumps(LPTfb, options)
 
-        #if merge_split_options['allow_merge_split']:
-        #    print('Doing splits and mergers.')
-        #    LPT_center_jumps = lpt.helpers.lpt_split_and_merge(LPT_center_jumps.copy(), merge_split_options)
-
         ## Eliminate short duration systems.
         print(('Remove LPT shorter than ' + str(options['min_lpt_duration_hours']) + ' hours.'))
         LPT_remove_short, BRANCHES_remove_short = lpt.helpers.remove_short_lived_systems(LPT_center_jumps, BRANCHESfb, options['min_lpt_duration_hours']
@@ -170,7 +166,7 @@ def lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,merge_s
         ## Handle splitting and merging, if specified.
         if merge_split_options['allow_merge_split']:
             LPT, BRANCHES = lpt.helpers.lpt_group_id_separate_branches(LPT_remove_short, BRANCHES_remove_short, options, verbose=True)
-            LPT, BRANCHES = lpt.helpers.lpt_split_and_merge(LPT, BRANCHES, merge_split_options)
+            LPT, BRANCHES = lpt.helpers.lpt_split_and_merge(LPT, BRANCHES, merge_split_options, options)
         else:
             LPT = LPT_remove_short.copy()
             BRANCHES = BRANCHES_remove_short.copy()
@@ -182,10 +178,6 @@ def lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,merge_s
             TIMECLUSTERS = lpt.helpers.calc_lpt_system_group_properties_with_branches(LPT, BRANCHES, options)
         else:
             TIMECLUSTERS = lpt.helpers.calc_lpt_system_group_properties(LPT, options)
-
-        ## Get "timeclusters" tracks.
-        #print('Calculating LPT properties.')
-        #TIMECLUSTERS = lpt.helpers.calc_lpt_system_group_properties(LPT_remove_short, options)
 
         fn_tc_base = (options['outdir'] + '/' + end_of_accumulation_time.strftime(output['sub_directory_format'])
                          + '/lpt_systems_' + dataset['label'] + '_rt_' + YMDH + '__' + str(options['lpt_history_days']) + 'days')
