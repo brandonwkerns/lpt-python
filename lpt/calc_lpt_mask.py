@@ -83,11 +83,12 @@ for year1 in range(year10, year11+1):
     ## For TMPA
     if prod == 'tmpa':
         filter='g20_72h'
-        thresh='thresh12'
+        thresh='thresh15'
         interval_hours=3
         accumulation_hours=72
         filter_stdev = 10   # Points in filter width.
-        YMDH1_YMDH2='{0:d}060100_{1:d}063021'.format(year1, year1+1)
+        #YMDH1_YMDH2='{0:d}060100_{1:d}063021'.format(year1, year1+1)
+        YMDH1_YMDH2='{0:d}111000_{1:d}122021'.format(year1, year1)
 
     ## For CFSR
     elif prod == 'cfsr':
@@ -161,7 +162,8 @@ for year1 in range(year10, year11+1):
     TC['area'] = DS['area_stitched'][:]
     for var in ['max_filtered_running_field','max_running_field','max_inst_field'
                 ,'min_filtered_running_field','min_running_field','min_inst_field'
-                ,'amean_filtered_running_field','amean_running_field','amean_inst_field']:
+                ,'amean_filtered_running_field','amean_running_field','amean_inst_field'
+                ,'duration','maxarea','zonal_propagation_speed','meridional_propagation_speed']:
         TC[var] = DS[var][:]
     DS.close()
 
@@ -196,6 +198,8 @@ for year1 in range(year10, year11+1):
 
         ## Include some basic LPT info for user friendliness.
         lptidx = [ii for ii in range(len(TC['lptid'])) if this_lpt_id == TC['lptid'][ii]][0]
+
+        # Time varying properties
         for var in ['centroid_lon','centroid_lat','area'
                     ,'max_filtered_running_field','max_running_field','max_inst_field'
                     ,'min_filtered_running_field','min_running_field','min_inst_field'
@@ -210,6 +214,11 @@ for year1 in range(year10, year11+1):
                     ,'min_filtered_running_field','min_running_field','min_inst_field'
                     ,'amean_filtered_running_field','amean_running_field','amean_inst_field']:
                     mask_arrays[var][this_time_indx] = TC[var][ttt]
+
+        # Bulk properties
+        for var in ['duration','maxarea','zonal_propagation_speed','meridional_propagation_speed']:
+            mask_arrays[var] = TC[var][0]
+        mask_arrays['volrain'] = MISSING
 
         for lp_object_id in lp_object_id_list:
 
@@ -299,6 +308,7 @@ for year1 in range(year10, year11+1):
 
         print('Writing to: ' + fn_out, flush=True)
         DSnew = Dataset(fn_out, 'w', data_model='NETCDF4', clobber=True)
+        DSnew.createDimension('n', 1)
         DSnew.createDimension('time',len(mask_times))
         if prod == 'wrf':
             ny,nx = lon.shape
@@ -314,15 +324,20 @@ for year1 in range(year10, year11+1):
 
 
         DSnew.createVariable('time','d',('time',)) # I would like to use u4, but ncview complains about dimension variable being unknown type.
-
         DSnew.createVariable('centroid_lon','f4',('time',),fill_value=FILL_VALUE)
         DSnew.createVariable('centroid_lat','f4',('time',),fill_value=FILL_VALUE)
         DSnew.createVariable('area','d',('time',),fill_value=FILL_VALUE)
 
+        # Time varying fields
         for var in ['max_filtered_running_field','max_running_field','max_inst_field'
                     ,'min_filtered_running_field','min_running_field','min_inst_field'
                     ,'amean_filtered_running_field','amean_running_field','amean_inst_field']:
             DSnew.createVariable(var,'f4',('time',),fill_value=FILL_VALUE)
+
+        # Bulk fields.
+        for var in ['duration','maxarea','zonal_propagation_speed','meridional_propagation_speed','volrain']:
+            DSnew.createVariable(var,'f4',('n',),fill_value=FILL_VALUE)
+
 
         ts = [(x - dt.datetime(1970,1,1,0,0,0)).total_seconds()/3600.0 for x in mask_times]
         DSnew['time'][:] = ts
@@ -335,12 +350,17 @@ for year1 in range(year10, year11+1):
         for mask_var in ['centroid_lon','centroid_lat','area'
                     ,'max_filtered_running_field','max_running_field','max_inst_field'
                     ,'min_filtered_running_field','min_running_field','min_inst_field'
-                    ,'amean_filtered_running_field','amean_running_field','amean_inst_field']:
+                    ,'amean_filtered_running_field','amean_running_field','amean_inst_field'
+                    ,'duration','maxarea','zonal_propagation_speed','meridional_propagation_speed','volrain']:
             DSnew[mask_var][:] = mask_arrays[mask_var]
 
         DSnew['centroid_lon'].setncatts({'units':'degrees_east','long_name':'centroid longitude (0-360)','standard_name':'longitude','note':'Time is end of running mean time.'})
         DSnew['centroid_lat'].setncatts({'units':'degrees_east','long_name':'centroid latitude (-90-00)','standard_name':'latitude','note':'Time is end of running mean time.'})
         DSnew['area'].setncatts({'units':'km2','long_name':'LPT System enclosed area','note':'Time is end of running mean time.'})
+        DSnew['maxarea'].setncatts({'units':'km2','long_name':'LPT System enclosed area','note':'This is the max over the LPT life time.'})
+        DSnew['duration'].setncatts({'units':'h','long_name':'LPT System duration'})
+        DSnew['zonal_propagation_speed'].setncatts({'units':'m s-1','long_name':'Zonal popagation speed','description':'Zonal popagation speed of the entire LPT system -- based on least squares fit of lon(time).'})
+        DSnew['meridional_propagation_speed'].setncatts({'units':'m s-1','long_name':'meridional popagation speed','description':'Meridional popagation speed of the entire LPT system -- based on least squares fit of lon(time).'})
         for var in ['max_filtered_running_field','max_running_field','max_inst_field'
                     ,'min_filtered_running_field','min_running_field','min_inst_field'
                     ,'amean_filtered_running_field','amean_running_field','amean_inst_field']:
