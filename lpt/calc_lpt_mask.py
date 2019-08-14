@@ -8,6 +8,18 @@ import os
 import sys
 import glob
 
+################################################################################
+## Calculate LPT System Masks.
+##
+## Usage: python calc_lpt_mask.py 2011 2011 tmpa
+##     (or, for WRF, python calc_lpt_mask.py 2011 2011 tmpa ind_20111122_ecmwf_p
+##        years are irrelevant for wrf, as it will use the wrfout files to get time.)
+##
+## - Run this after the LPT tracking is all done.
+## - A single file for each LPT System.
+## - LPT System tracking and volumetric rain are included.
+##
+################################################################################
 
 plt.close('all')
 verbose=False
@@ -27,6 +39,12 @@ if len(sys.argv) < 4:
     prod = 'tmpa'
 else:
     prod = sys.argv[3]
+
+if len(sys.argv) < 5:
+    label = 'ind_20111122_ecmwf_p'
+else:
+    label = sys.argv[4]
+
 
 data_dir = '/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data'
 
@@ -89,6 +107,8 @@ for year1 in range(year10, year11+1):
         filter_stdev = 10   # Points in filter width.
         #YMDH1_YMDH2='{0:d}060100_{1:d}063021'.format(year1, year1+1)
         YMDH1_YMDH2='{0:d}111000_{1:d}122021'.format(year1, year1)
+        rain_dir = '/home/orca/data/satellite/trmm_global_rainfall'
+        rain_read_function = lpt.readdata.read_tmpa_at_datetime
 
     ## For CFSR
     elif prod == 'cfsr':
@@ -128,7 +148,9 @@ for year1 in range(year10, year11+1):
         accumulation_hours=72
         filter_stdev = 14   # Points in filter width.
         YMDH1_YMDH2='{0:d}060100_{1:d}063018'.format(year1, year1+1)
-        label='ind_20111122_ecmwf_p'
+        rain_dir = '/home/orca/asavarin/umcm/output/' + label
+        def rain_read_function(dt_this, verbose='True'):
+            return lpt.readdata.get_wrfout_rain(dt_this, verbose=verbose, raw_data_parent_dir = rain_dir)
 
     else:
 
@@ -219,6 +241,7 @@ for year1 in range(year10, year11+1):
         for var in ['duration','maxarea','zonal_propagation_speed','meridional_propagation_speed']:
             mask_arrays[var] = TC[var][0]
         mask_arrays['volrain'] = MISSING
+        mask_arrays['volrain_global'] = MISSING
 
         for lp_object_id in lp_object_id_list:
 
@@ -252,6 +275,7 @@ for year1 in range(year10, year11+1):
             if not 'lon' in mask_arrays:
                 lon = DS['grid_lon'][:]
                 lat = DS['grid_lat'][:]
+                AREA = DS['grid_area'][:]
                 mask_arrays['lon'] = DS['grid_lon'][:]
                 mask_arrays['lat'] = DS['grid_lat'][:]
                 if prod == 'wrf':
@@ -297,6 +321,55 @@ for year1 in range(year10, year11+1):
         mask_arrays['mask_with_filter_at_end_time'] = feature_spread(mask_arrays['mask_at_end_time'], filter_stdev)
         mask_arrays['mask_with_filter_and_accumulation'] = feature_spread(mask_arrays['mask_with_accumulation'], filter_stdev)
 
+        ## Do volumetric rain.
+        print('Now calculating the volumetric rain.', flush=True)
+        this_volrain = 0.0
+        global_volrain = 0.0
+        volrain_in_time = np.nan * np.zeros(len(mask_times))
+        global_volrain_in_time = np.nan * np.zeros(len(mask_times))
+
+        for tt in range(len(mask_times)):
+
+            this_dt = mask_times[tt]
+            this_mask = mask_arrays['mask_with_filter_and_accumulation'][tt] #mask[tt]
+            this_mask[this_mask > 0] = 1.0
+
+            if prod == 'wrf':
+                try:
+                    RAIN1 = rain_read_function(this_dt, verbose=True)
+                    precip = RAIN1['precip'][:]
+                except FileNotFoundError:
+                    print('No wrfout file at this time! Hopefully this was before the beginning of the run. Moving on...')
+                    continue
+
+                try:
+                    RAIN0 = rain_read_function(this_dt - dt.timedelta(hours=interval_hours), verbose=True)
+                    precip -= RAIN0['precip'][:]
+                    precip /= interval_hours
+                except:
+                    print('No previous wrfout file. Hopefully this was the beginning of the run.')
+            else:
+                RAIN = rain_read_function(this_dt, verbose=False)
+                precip = RAIN['precip'][:]
+
+            precip[~np.isfinite(precip)] = 0.0
+            precip[precip < -0.01] = 0.0
+
+            precip_masked = precip * this_mask
+
+            this_volrain += interval_hours * np.sum(precip_masked * AREA)
+            global_volrain += interval_hours * np.sum(precip * AREA)
+            volrain_in_time[tt] = interval_hours * np.sum(precip_masked * AREA)
+            global_volrain_in_time[tt] = interval_hours * np.sum(precip * AREA)
+
+            #print((this_volrain, global_volrain, this_volrain / global_volrain))
+
+        mask_arrays['volrain_accum'] = this_volrain
+        mask_arrays['volrain_accum_global'] = global_volrain
+        mask_arrays['volrain'] = volrain_in_time
+        mask_arrays['volrain_global'] = global_volrain_in_time
+
+
         ##
         ## Output.
         ##
@@ -306,6 +379,7 @@ for year1 in range(year10, year11+1):
             fn_out = (data_dir + '/'+prod+'/'+filter+'/'+thresh+'/systems/'+YMDH1_YMDH2+'/lpt_system_mask_'+YMDH1_YMDH2+'.lptid{0:010.4f}.nc'.format(this_lpt_id))
         os.makedirs(data_dir + '/'+prod+'/'+filter+'/'+thresh+'/systems/'+YMDH1_YMDH2, exist_ok=True)
 
+        os.remove(fn_out)
         print('Writing to: ' + fn_out, flush=True)
         DSnew = Dataset(fn_out, 'w', data_model='NETCDF4', clobber=True)
         DSnew.createDimension('n', 1)
@@ -316,11 +390,13 @@ for year1 in range(year10, year11+1):
             DSnew.createDimension('y',ny)
             DSnew.createVariable('lon','f4',('y','x'))
             DSnew.createVariable('lat','f4',('y','x'))
+            DSnew.createVariable('grid_area','f4',('y','x'))
         else:
             DSnew.createDimension('lon',len(lon))
             DSnew.createDimension('lat',len(lat))
             DSnew.createVariable('lon','f4',('lon',))
             DSnew.createVariable('lat','f4',('lat',))
+            DSnew.createVariable('grid_area','f4',('lat','lon'))
 
 
         DSnew.createVariable('time','d',('time',)) # I would like to use u4, but ncview complains about dimension variable being unknown type.
@@ -331,11 +407,11 @@ for year1 in range(year10, year11+1):
         # Time varying fields
         for var in ['max_filtered_running_field','max_running_field','max_inst_field'
                     ,'min_filtered_running_field','min_running_field','min_inst_field'
-                    ,'amean_filtered_running_field','amean_running_field','amean_inst_field']:
+                    ,'amean_filtered_running_field','amean_running_field','amean_inst_field','volrain','volrain_global']:
             DSnew.createVariable(var,'f4',('time',),fill_value=FILL_VALUE)
 
         # Bulk fields.
-        for var in ['duration','maxarea','zonal_propagation_speed','meridional_propagation_speed','volrain']:
+        for var in ['duration','maxarea','zonal_propagation_speed','meridional_propagation_speed','volrain_accum','volrain_accum_global']:
             DSnew.createVariable(var,'f4',('n',),fill_value=FILL_VALUE)
 
 
@@ -351,7 +427,8 @@ for year1 in range(year10, year11+1):
                     ,'max_filtered_running_field','max_running_field','max_inst_field'
                     ,'min_filtered_running_field','min_running_field','min_inst_field'
                     ,'amean_filtered_running_field','amean_running_field','amean_inst_field'
-                    ,'duration','maxarea','zonal_propagation_speed','meridional_propagation_speed','volrain']:
+                    ,'duration','maxarea','zonal_propagation_speed','meridional_propagation_speed'
+                    ,'volrain','volrain_global','volrain_accum','volrain_accum_global']:
             DSnew[mask_var][:] = mask_arrays[mask_var]
 
         DSnew['centroid_lon'].setncatts({'units':'degrees_east','long_name':'centroid longitude (0-360)','standard_name':'longitude','note':'Time is end of running mean time.'})
@@ -361,10 +438,15 @@ for year1 in range(year10, year11+1):
         DSnew['duration'].setncatts({'units':'h','long_name':'LPT System duration'})
         DSnew['zonal_propagation_speed'].setncatts({'units':'m s-1','long_name':'Zonal popagation speed','description':'Zonal popagation speed of the entire LPT system -- based on least squares fit of lon(time).'})
         DSnew['meridional_propagation_speed'].setncatts({'units':'m s-1','long_name':'meridional popagation speed','description':'Meridional popagation speed of the entire LPT system -- based on least squares fit of lon(time).'})
+        DSnew['volrain'].setncatts({'units':'mm - km2','long_name':'LPT System Volumetric Rain time series','description':'Volumetric rain (sum of area * raw rain rate) within the mask WITH filter and accumulaiton.'})
+        DSnew['volrain_global'].setncatts({'units':'mm - km2','long_name':'Global (e.g., full domain area) Volumetric Rain time series-- concurrent with LPT System','description':'Total global/full domain volumetric rain (sum of area * raw rain rate) during the entire period of the mask WITH filter and accumulaiton.'})
+        DSnew['volrain_accum'].setncatts({'units':'mm - km2','long_name':'LPT System Volumetric Rain accumulation','description':'Volumetric rain (sum of area * raw rain rate) within the mask WITH filter and accumulaiton.'})
+        DSnew['volrain_accum_global'].setncatts({'units':'mm - km2','long_name':'Global (e.g., full domain area) Volumetric Rain accumulation -- concurrent with LPT System','description':'Total global/full domain volumetric rain (sum of area * raw rain rate) during the entire period of the mask WITH filter and accumulaiton.'})
+
         for var in ['max_filtered_running_field','max_running_field','max_inst_field'
                     ,'min_filtered_running_field','min_running_field','min_inst_field'
                     ,'amean_filtered_running_field','amean_running_field','amean_inst_field']:
-            DSnew[var].setncatts({'units':'mm day-1','long_name':'LP object running mean rain rate (at end of accum time).','note':'Time is end of running mean time.'})
+            DSnew[var].setncatts({'units':'mm day-1','long_name':'LP object running mean rain rate (at end of accum time).','note':'Time is end of running mean time. Based on mask_at_end_time'})
 
         for mask_var in ['mask_at_end_time','mask_with_filter_at_end_time','mask_with_accumulation','mask_with_filter_and_accumulation']:
             if prod == 'wrf':
@@ -376,5 +458,9 @@ for year1 in range(year10, year11+1):
                 DSnew.createVariable(mask_var,'i',('time','lat','lon'), zlib=True, complevel=4)
                 DSnew[mask_var][:] = mask_arrays[mask_var]
                 DSnew[mask_var].setncattr('units','1')
+
+        DSnew['grid_area'][:] = AREA
+        DSnew['grid_area'].setncattr('units','km2')
+        DSnew['grid_area'].setncattr('description','Area of each grid cell.')
 
         DSnew.close()
