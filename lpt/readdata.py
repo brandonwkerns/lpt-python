@@ -577,6 +577,8 @@ def get_wrfout_rain(dt_ending, verbose=False, raw_data_parent_dir='./'):
 
     fmt = '%Y-%m-%d_%H:00:00'
     timestamp_ending = dt_ending.strftime(fmt)
+    if verbose:
+        print(raw_data_parent_dir + '/wrfout_d01_' + timestamp_ending)
     DS = Dataset(raw_data_parent_dir + '/wrfout_d01_' + timestamp_ending)
 
     lon = DS['XLONG'][:][0]
