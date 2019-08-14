@@ -48,6 +48,7 @@ def lp_objects_output_netcdf(fn, OBJ):
 
     print('Writing LP object NetCDF output to: ' + fn)
 
+    os.remove(fn)
     DS = Dataset(fn, 'w', format='NETCDF4_CLASSIC', clobber=True)
     DS.description = ("LP Objects NetCDF file. Time stamp is for the END of running mean time. nobj is the number of objects (each one has an objid), "
         + "and npoints is the max pixels in any object. "
