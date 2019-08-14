@@ -379,7 +379,7 @@ for year1 in range(year10, year11+1):
             fn_out = (data_dir + '/'+prod+'/'+filter+'/'+thresh+'/systems/'+YMDH1_YMDH2+'/lpt_system_mask_'+YMDH1_YMDH2+'.lptid{0:010.4f}.nc'.format(this_lpt_id))
         os.makedirs(data_dir + '/'+prod+'/'+filter+'/'+thresh+'/systems/'+YMDH1_YMDH2, exist_ok=True)
 
-        os.remove(fn_out)
+        os.remove(fn_out) if os.path.exists(fn_out) else None
         print('Writing to: ' + fn_out, flush=True)
         DSnew = Dataset(fn_out, 'w', data_model='NETCDF4', clobber=True)
         DSnew.createDimension('n', 1)
