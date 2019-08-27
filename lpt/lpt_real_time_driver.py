@@ -91,7 +91,7 @@ def lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,merge_s
                 print('filter done.',flush=True)
 
                 ## Get LP objects.
-                label_im = lpt.helpers.identify_lp_objects(DATA_FILTERED, lpo_options['thresh'], verbose=dataset['verbose'])
+                label_im = lpt.helpers.identify_lp_objects(DATA_FILTERED, lpo_options['thresh'], min_points=lpo_options['min_points'], verbose=dataset['verbose'])
                 OBJ = lpt.helpers.calculate_lp_object_properties(DATA_RAW['lon'], DATA_RAW['lat']
                             , DATA_RAW['precip'], DATA_ACCUM, DATA_FILTERED, label_im, 0
                             , end_of_accumulation_time, verbose=True)
@@ -194,6 +194,9 @@ def lpt_real_time_driver(dataset,plotting,output,lpo_options,lpt_options,merge_s
         else:
             TIMECLUSTERS = lpt.helpers.calc_lpt_system_group_properties(LPT, options)
 
+        """
+        LPT System output
+        """
         fn_tc_base = (options['outdir'] + '/' + end_of_accumulation_time.strftime(output['sub_directory_format'])
                          + '/lpt_systems_' + dataset['label'] + '_rt_' + YMDH + '__' + str(options['lpt_history_days']) + 'days')
         lpt.lptio.lpt_system_tracks_output_ascii(fn_tc_base + '.txt', TIMECLUSTERS)
