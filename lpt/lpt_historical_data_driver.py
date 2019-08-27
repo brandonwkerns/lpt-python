@@ -53,9 +53,12 @@ def lpt_historical_data_driver(dataset,plotting,output,lpo_options,lpt_options,m
 
                 beginning_of_accumulation_time = end_of_accumulation_time - dt.timedelta(hours=lpo_options['accumulation_hours'])
                 print((beginning_of_accumulation_time, end_of_accumulation_time))
-                dt_list = [beginning_of_accumulation_time
-                    + dt.timedelta(hours=x) for x in np.double(np.arange(0,lpo_options['accumulation_hours']
-                                                      + dataset['data_time_interval'],dataset['data_time_interval']))]
+                if lpo_options['accumulation_hours'] > 0.1:
+                    dt_list = [beginning_of_accumulation_time
+                        + dt.timedelta(hours=x) for x in np.double(np.arange(0,lpo_options['accumulation_hours']
+                                                          + dataset['data_time_interval'],dataset['data_time_interval']))]
+                else:
+                    dt_list = [end_of_accumulation_time]
 
                 ## Get accumulated rain.
                 data_collect = []
@@ -76,13 +79,30 @@ def lpt_historical_data_driver(dataset,plotting,output,lpo_options,lpt_options,m
                 DATA_RUNNING = (data_collect/count) * 24.0 # Get the mean in mm/day.
                 print('Running mean done.',flush=True)
 
+                fig=plt.figure()
+                plt.pcolormesh(DATA_RUNNING)
+                plt.colorbar()
+                plt.savefig('test0.png')
+                plt.close(fig)
+
                 ## Filter the data
-                DATA_FILTERED = scipy.ndimage.gaussian_filter(DATA_RUNNING, lpo_options['filter_stdev']
-                    , order=0, output=None, mode='reflect', cval=0.0, truncate=3.0)
-                print('filter done.',flush=True)
+                if lpo_options['filter_stdev'] > 0.001:
+                    DATA_FILTERED = scipy.ndimage.gaussian_filter(DATA_RUNNING, lpo_options['filter_stdev']
+                        , order=0, output=None, mode='reflect', cval=0.0, truncate=3.0)
+                    print('filter done.',flush=True)
+                else:
+                    DATA_FILTERED = DATA_RUNNING.copy()
+                    print('Filter set to 0, so not doing filter.')
 
                 ## Get LP objects.
-                label_im = lpt.helpers.identify_lp_objects(DATA_FILTERED, lpo_options['thresh'], verbose=dataset['verbose'])
+                object_is_gt_threshold = True
+                if 'object_is_gt_threshold' in lpo_options:
+                    if not lpo_options['object_is_gt_threshold']:
+                        object_is_gt_threshold = False
+
+                if not 'min_points' in lpo_options:
+                    lpo_options['min_points'] = 1
+                label_im = lpt.helpers.identify_lp_objects(DATA_FILTERED, lpo_options['thresh'], object_is_gt_threshold=object_is_gt_threshold, min_points=lpo_options['min_points'],verbose=dataset['verbose'])
                 OBJ = lpt.helpers.calculate_lp_object_properties(DATA_RAW['lon'], DATA_RAW['lat']
                             , DATA_RAW['precip'], DATA_RUNNING, DATA_FILTERED, label_im, 0
                             , end_of_accumulation_time, verbose=True)
@@ -150,8 +170,6 @@ def lpt_historical_data_driver(dataset,plotting,output,lpo_options,lpt_options,m
                     + '/' + filter_str(lpo_options['filter_stdev'])
                     + '_' + str(int(lpo_options['accumulation_hours'])) + 'h'
                     + '/thresh' + str(int(lpo_options['thresh'])) + '/systems')
-    print(options)
-    print(lpo_options)
 
     if options['do_lpt_calc']:
 
@@ -210,7 +228,6 @@ def lpt_historical_data_driver(dataset,plotting,output,lpo_options,lpt_options,m
 
 
         BRANCHES = lpt.helpers.reorder_LPT_branches(LPT, BRANCHES)
-        #print(str(BRANCHES))
 
         ## Get "timeclusters" tracks.
         print('Calculating LPT properties.')
