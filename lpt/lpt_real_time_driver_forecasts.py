@@ -225,6 +225,8 @@ def lpt_real_time_driver_forecasts(dataset,plotting,output,lpo_options,lpt_optio
         ax2.set_title((dataset['label'].upper() + ' ' + str(lpt_options['lpt_history_days']) + ' Day'
                         + ' FCST 15S-15N Rain Rate and LPTs\nInitialized: ' + YMDHi_fancy), fontsize=plotting['label_font_size'])
 
+        ax2.text(0.87,1.02,'(<15$\degree$S, >15$\degree$N Dashed)', transform=ax2.transAxes)
+
         img_dir2 = (output['img_dir'] + '/' + dataset['label'] + '/systems/'
                         + model_init_time.strftime(output['sub_directory_format']))
 
