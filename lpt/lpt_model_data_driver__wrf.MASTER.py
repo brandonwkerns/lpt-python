@@ -28,7 +28,7 @@ Dataset Case Settings
 """
 dataset={}
 dataset['label'] = 'wrf'
-dataset['raw_data_parent_dir'] = '/home/orca/asavarin/umcm/output/ind_20111122_ecmwf_d'
+dataset['raw_data_parent_dir'] = '/home/orca/asavarin/umcm/output/ind_20111122_ecmwf_p'
 dataset['sub_directory_format'] = ''
 dataset['data_time_interval'] = 1           # Time resolution of the data in hours.
 dataset['read_function'] = lpt.readdata.get_wrfout_rain
@@ -47,13 +47,13 @@ plotting['time_lon_range'] = [40, 200]       # Longitude Range for time-longitud
 output={}
 output['img_dir'] = '/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/images'
 output['data_dir'] = '/home/orca/bkerns/public_html/realtime_mjo_tracking/lpt/data'
-output['sub_directory_format'] = 'ind_20111122_ecmwf_d'
+output['sub_directory_format'] = 'ind_20111122_ecmwf_p'
 
 ## LP Object settings
 lpo_options={}
-lpo_options['do_lpo_calc'] = True
-#lpo_options['do_lpo_calc'] = False
-lpo_options['thresh'] = 14.0                 # LP Objects threshold
+#lpo_options['do_lpo_calc'] = True
+lpo_options['do_lpo_calc'] = False
+lpo_options['thresh'] = 15.0                 # LP Objects threshold
 lpo_options['accumulation_hours'] = 72       # Accumulation period for LP objects.
 lpo_options['filter_stdev'] = 14             # Gaussian filter width, in terms of grid points.
 
