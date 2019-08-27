@@ -134,7 +134,7 @@ def plot_rain_map_with_filtered_contour(ax, DATA_ACCUM, OBJ, plot_area=[50, 200,
 
 
 def plot_timelon_with_lpt(ax2, dt_list, lon, timelon_rain, TIMECLUSTERS
-        , lon_range, accum_time_hours = 0, label_font_size=10):
+        , lon_range, accum_time_hours = 0, label_font_size=10, offset_time=True):
 
     #cmap = cmap_map(lambda x: x/2 + 0.5, plt.cm.jet)
     #cmap = cmap_map(lambda x: x, plt.cm.jet)
@@ -194,7 +194,10 @@ def plot_timelon_with_lpt(ax2, dt_list, lon, timelon_rain, TIMECLUSTERS
     for ii in range(len(TIMECLUSTERS)):
         x = TIMECLUSTERS[ii]['centroid_lon']
         lat = TIMECLUSTERS[ii]['centroid_lat']
-        y = [yy - dt.timedelta(hours=0.5*accum_time_hours) for yy in TIMECLUSTERS[ii]['datetime']]
+        if offset_time:
+            y = [yy - dt.timedelta(hours=0.5*accum_time_hours) for yy in TIMECLUSTERS[ii]['datetime']]
+        else:
+            y = TIMECLUSTERS[ii]['datetime']
 
         this_color_idx = int(np.floor(TIMECLUSTERS[ii]['lpt_id'])) % len(lpt_group_colors[:,0])
         this_color = lpt_group_colors[this_color_idx,:]
