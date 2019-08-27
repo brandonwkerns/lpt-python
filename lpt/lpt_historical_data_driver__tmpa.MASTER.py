@@ -28,7 +28,7 @@ Dataset Case Settings
 """
 dataset={}
 dataset['label'] = 'tmpa'
-dataset['raw_data_parent_dir'] = '/home/orca/data/model_anal/cfsr/rain_accum/'
+dataset['raw_data_parent_dir'] = '/home/orca/data/satellite/trmm_global_rainfall'
 dataset['sub_directory_format'] = '%Y'
 dataset['data_time_interval'] = 3           # Time resolution of the data in hours.
 dataset['read_function'] = lpt.readdata.read_tmpa_at_datetime
@@ -51,8 +51,8 @@ output['sub_directory_format'] = '%Y/%m/%Y%m%d'
 
 ## LP Object settings
 lpo_options={}
-lpo_options['do_lpo_calc'] = True
-#lpo_options['do_lpo_calc'] = False
+#lpo_options['do_lpo_calc'] = True
+lpo_options['do_lpo_calc'] = False
 lpo_options['thresh'] = 12.0                 # LP Objects threshold
 lpo_options['accumulation_hours'] = 72       # Accumulation period for LP objects.
 lpo_options['filter_stdev'] = 20             # Gaussian filter width, in terms of grid points.
