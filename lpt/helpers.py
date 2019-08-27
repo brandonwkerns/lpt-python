@@ -58,21 +58,24 @@ def identify_lp_objects(field, threshold, min_points=1
     else:
         field_bw[(field < threshold)] = 1
 
-
     label_im, nb_labels = ndimage.label(field_bw)
     if verbose:
         print('Found '+str(nb_labels)+' objects.', flush=True) # how many regions?
 
     label_points = ndimage.sum(1, label_im, range(nb_labels+1))
-    print(str(label_points))
 
     throw_away = [x for x in range(1, nb_labels+1) if label_points[x] < min_points]
-
     if len(throw_away) > 0:
         if verbose:
             print('Discarding ' + str(len(throw_away)) + ' features that were < ' + str(min_points) + ' points.')
-        label_im = np.array([[x if not x in throw_away else 0 for x in y] for y in label_im])
-        ## TODO: Re-order LP Object IDs.
+        for nn in throw_away:
+            label_im[label_im == nn] = 0
+
+        ## Re-order LP Object IDs.
+        label_im_old = label_im.copy()
+        id_list = sorted(np.unique(label_im_old))
+        for nn in range(len(id_list)):
+            label_im[label_im_old == id_list[nn]] = nn
 
     return label_im
 
@@ -250,29 +253,36 @@ def calc_overlapping_points(objid1, objid2, objdir, fmt="/%Y/%m/%Y%m%d/objects_%
 
     fn1 = (objdir + dt1.strftime(fmt))
     fn2 = (objdir + dt2.strftime(fmt))
+    #print(('1. ',dt.datetime.now()), flush=True)
 
     DS1 = Dataset(fn1)
     id1 = DS1['objid'][:]
-    idx1, = np.where(np.abs(id1 - objid1) < 0.1)
+    idx1, = np.where(id1 == objid1)
     x1 = to1d(DS1['pixels_x'][:][idx1])
     y1 = to1d(DS1['pixels_y'][:][idx1])
     DS1.close()
 
+    #print(('2. ',dt.datetime.now()), flush=True)
+
     DS2 = Dataset(fn2)
     id2 = DS2['objid'][:]
-    idx2, = np.where(np.abs(id2 - objid2) < 0.1)
+    idx2, = np.where(id2 == objid2)
     x2 = to1d(DS2['pixels_x'][:][idx2])
     y2 = to1d(DS2['pixels_y'][:][idx2])
     DS2.close()
+    #print(('3. ',dt.datetime.now()), flush=True)
 
     xy1 = set(zip(x1,y1))
     xy2 = set(zip(x2,y2))
+    #print(('4. ',dt.datetime.now()), flush=True)
+
     overlap = [x in xy2 for x in xy1]
+    #print(('5. ',dt.datetime.now()), flush=True)
 
     return (len(x1), len(x2), np.sum(overlap))
 
 
-def init_lpt_group_array(dt_list, objdir, fmt = "/%Y/%m/%Y%m%d/objects_%Y%m%d%H.nc"):
+def init_lpt_group_array(dt_list, objdir, min_points = 1, fmt = "/%Y/%m/%Y%m%d/objects_%Y%m%d%H.nc"):
     """
     "LPT" is a 2-D "group" array (np.int64) with columns: [timestamp, objid, lpt_group_id, begin_point, end_point, split_point]
     -- timestamp = Linux time stamp (e.g., seconds since 0000 UTC 1970-1-1)
@@ -300,14 +310,17 @@ def init_lpt_group_array(dt_list, objdir, fmt = "/%Y/%m/%Y%m%d/objects_%Y%m%d%H.
             DS = Dataset(fn)
             try:
                 id_list = DS['objid'][:]
+                pixels_x = DS['pixels_x'][:]
             except IndexError:
                 print('WARNING: No LPO at this time: ' + str(this_dt))
                 id_list = [] # In case of no LPOs at this time.
             DS.close()
 
             for ii in range(len(id_list)):
-                LPT.append([int((this_dt - dt.datetime(1970,1,1,0,0,0)).total_seconds()), int(id_list[ii]), -1, 0, 1, 0])
-                BRANCHES.append(int(0))
+                npts = pixels_x[ii,:].count()  #ma.count() for number of non masked values.
+                if npts >= min_points:
+                    LPT.append([int((this_dt - dt.datetime(1970,1,1,0,0,0)).total_seconds()), int(id_list[ii]), -1, 0, 1, 0])
+                    BRANCHES.append(int(0))
 
         except FileNotFoundError:
             print('WARNING: Missing this file!')
@@ -347,9 +360,10 @@ def lpt_group_array_remove_small_objects(LPT, BRANCHES, options, verbose=False, 
         if (len(x1) < options['min_lp_objects_points']):
             keep_list[ii] = False
 
-    return (LPT2[keep_list,:], [BRANCHES2[ii]for ii in range(len(BRANCHES2)) if keep_list[ii]])
+    return (LPT2[keep_list,:], [BRANCHES2[ii] for ii in range(len(BRANCHES2)) if keep_list[ii]])
 
-def calc_lpt_group_array(LPT0, BRANCHES0, options, verbose=False, reversed=False, fmt="/%Y/%m/%Y%m%d/objects_%Y%m%d%H.nc"):
+
+def calc_lpt_group_array(LPT0, BRANCHES0, options, min_points=1, verbose=False, reversed=False, fmt="/%Y/%m/%Y%m%d/objects_%Y%m%d%H.nc"):
 
     """
     usage: LPT = calc_lpt_group_array(LPT, objdir, options)
@@ -399,9 +413,67 @@ def calc_lpt_group_array(LPT0, BRANCHES0, options, verbose=False, reversed=False
     for tt in range(1,len(time_list)):
         this_time = time_list[tt]
         prev_time = time_list[tt-1]
+        this_dt = dt.datetime(1970,1,1,0,0,0) + dt.timedelta(seconds=int(this_time))
+        prev_dt = dt.datetime(1970,1,1,0,0,0) + dt.timedelta(seconds=int(prev_time))
 
         if verbose:
             print(dt.datetime(1970,1,1,0,0,0) + dt.timedelta(seconds=int(this_time)), flush=True)
+
+        fn1 = objdir + '/' + this_dt.strftime(fmt)
+        fn2 = objdir + '/' + prev_dt.strftime(fmt)
+
+        DS1 = Dataset(fn1, 'r')
+        mask1 = DS1['grid_mask'][:]
+        objid1 = DS1['objid'][:]
+        DS1.close()
+
+        DS2 = Dataset(fn2, 'r')
+        mask2 = DS2['grid_mask'][:]
+        objid2 = DS2['objid'][:]
+        DS2.close()
+
+        ## Apply minimum size.
+        if min_points > 1:
+            sizes = ndimage.sum(1, mask1, range(np.nanmax(mask1)+1))
+            for nn in [x for x in range(1,len(sizes)) if sizes[x] < min_points]:
+                mask1[mask1 == nn] = 0
+
+            sizes = ndimage.sum(1, mask2, range(np.nanmax(mask2)+1))
+            for nn in [x for x in range(1,len(sizes)) if sizes[x] < min_points]:
+                mask2[mask2 == nn] = 0
+
+
+        ## Each overlap must necessarily be one LPO against another single LPO.
+        overlap = np.logical_and(mask1 > -1, mask2 > -1)
+        label_im, nb_labels = ndimage.label(overlap)
+
+        fig=plt.figure()
+        plt.pcolormesh(label_im)
+        plt.savefig('overlap.png')
+        plt.close(fig)
+
+        ## Construct overlapping points structure
+        #           -----------> objid2
+        #   |
+        #   |
+        #   |
+        #   v
+        # objid1
+        #
+
+        overlapping_npoints = np.zeros([len(objid1), len(objid2)])
+        overlapping_frac1 = np.zeros([len(objid1), len(objid2)])
+        overlapping_frac2 = np.zeros([len(objid1), len(objid2)])
+
+        for nn in range(1,nb_labels+1):
+            #print(str(nn) + ' of ' + str(nb_labels) + '.')
+            ## Figure out which LPOs this represents.
+            ii = int(ndimage.maximum(mask1, label_im, nn))
+            jj = int(ndimage.maximum(mask2, label_im, nn))
+
+            overlapping_npoints[ii,jj] = ndimage.sum(overlap, label_im, nn)
+            overlapping_frac1[ii,jj] = overlapping_npoints[ii,jj] / np.sum(mask1==ii)
+            overlapping_frac2[ii,jj] = overlapping_npoints[ii,jj] / np.sum(mask2==jj)
 
         this_time_idx, = np.where(np.abs(LPT[:,0] - this_time) <= 0)
         prev_time_idx, = np.where(np.abs(LPT[:,0] - prev_time) <= 0)
@@ -413,17 +485,23 @@ def calc_lpt_group_array(LPT0, BRANCHES0, options, verbose=False, reversed=False
                                 # This will be a list of tuples, each like (jj, branch_to_append).
         for ii in this_time_idx:
             this_objid = LPT[ii][1]
+            idx1 = int(str(this_objid)[-4:])
+
             match = -1
             for jj in prev_time_idx:
                 prev_objid = LPT[jj][1]
+                idx2 = int(str(prev_objid)[-4:])
 
-                n_this, n_prev, n_overlap = calc_overlapping_points(this_objid,prev_objid,objdir, fmt=fmt)
+                #n_this, n_prev, n_overlap = calc_overlapping_points(this_objid,prev_objid,objdir, fmt=fmt)
+                n_overlap = overlapping_npoints[idx1,idx2]
+                frac1 = overlapping_frac1[idx1,idx2]
+                frac2 = overlapping_frac2[idx1,idx2]
 
                 if n_overlap >= options['min_overlap_points']:
                     match=jj
-                if 1.0*n_overlap/n_this > options['min_overlap_frac']:
+                if 1.0*frac1 > options['min_overlap_frac']:
                     match=jj
-                if 1.0*n_overlap/n_prev > options['min_overlap_frac']:
+                if 1.0*frac2 > options['min_overlap_frac']:
                     match=jj
 
             if match > -1:  # I found a match! Note: for merging cases,
@@ -486,6 +564,250 @@ def calc_lpt_group_array(LPT0, BRANCHES0, options, verbose=False, reversed=False
         BRANCHES = BRANCHES[::-1]
 
     return (LPT, BRANCHES)
+
+
+############################################################################
+############################################################################
+############################################################################
+
+## This version tries to do forward and backwards in one fell swoop.
+def calc_lpt_group_array2(LPT0, BRANCHES0, options, min_points=1, verbose=False, fmt="/%Y/%m/%Y%m%d/objects_%Y%m%d%H.nc"):
+
+    """
+    usage: LPT = calc_lpt_group_array(LPT, objdir, options)
+    Calculate the simple LPT groups.
+
+    options dictionary entries needed:
+    options['objdir']
+    options['min_overlap_points']
+    options['min_overlap_frac']
+
+    "LPT" is a 2-D "group" array (np.int64) with columns: [timestamp, objid, lpt_group_id, begin_point, end_point, split_point]
+    -- timestamp = Linux time stamp (e.g., seconds since 00 UTC 1970-1-1)
+    -- objid = LP object id (YYYYMMDDHHnnnn)
+    -- lpt_group_id = LPT group id, connected LP objects have a common LPT group id.
+    -- begin point = 1 if it is the beginning of a track. 0 otherwise.
+    -- end point = 1 if no tracks were connected to it, 0 otherwise.
+    -- split point = 1 if split detected, 0 otherwise.
+
+    BRANCHES is a 1-D native Python list with native Python int values.
+    This is needed because BRANCHES is bitwise, and there can be more than 64 branches in a group.
+    -- branches = bitwise binary starts from 1 at each branch. Mergers will have separate branch numbers.
+                   overlapping portions will have multiple branch numbers associated with them.
+    """
+
+    # Make copies to avoid immutability weirdness.
+    LPT = LPT0.copy()
+    BRANCHES = BRANCHES0.copy()
+
+    objdir = options['objdir']
+    next_lpt_group_id = 0
+
+    time_list = np.unique(LPT[:,0])
+    first_time = time_list[0]
+    first_time_idx, = np.where(np.abs(LPT[:,0] - first_time) < 0.1)
+
+    ## The LPOs at the first time all get assigned new groups.
+    for ii in range(len(first_time_idx)):
+        LPT[first_time_idx[ii]][2] = next_lpt_group_id
+        LPT[first_time_idx[ii]][3] = 1
+        BRANCHES[first_time_idx[ii]] = int(1) # This is the first branch of the LPT. (e.g., 2**0)
+        next_lpt_group_id += 1
+
+    ## Now, loop through the rest of the times.
+    for tt in range(1,len(time_list)):
+
+        ## Datetimes for this time and previous time.
+        this_time = time_list[tt]
+        prev_time = time_list[tt-1]
+        this_dt = dt.datetime(1970,1,1,0,0,0) + dt.timedelta(seconds=int(this_time))
+        prev_dt = dt.datetime(1970,1,1,0,0,0) + dt.timedelta(seconds=int(prev_time))
+        print(this_dt, flush=True)
+
+        ## The indices (e.g., LPT and BRANCHES array rows) for these times.
+        this_time_idx, = np.where(np.abs(LPT[:,0] - this_time) <= 0)
+        prev_time_idx, = np.where(np.abs(LPT[:,0] - prev_time) <= 0)
+
+        ##
+        ## Read in LPO masks for current and previous times.
+        ##
+        fn1 = objdir + '/' + this_dt.strftime(fmt)
+        fn2 = objdir + '/' + prev_dt.strftime(fmt)
+
+        DS1 = Dataset(fn1, 'r')
+        mask1 = DS1['grid_mask'][:]
+        objid1 = DS1['objid'][:]
+        DS1.close()
+
+        DS2 = Dataset(fn2, 'r')
+        mask2 = DS2['grid_mask'][:]
+        objid2 = DS2['objid'][:]
+        DS2.close()
+
+        ##
+        ## Apply minimum size.
+        ## Any LPOs smaller than the minimum size get taken out of the mask.
+        ## Their mask values get set to zero, and they will not be considered
+        ## for overlapping.
+        ##
+        if min_points > 1:
+            sizes = ndimage.sum(1, mask1, range(np.nanmax(mask1)+1))
+            for nn in [x for x in range(1,len(sizes)) if sizes[x] < min_points]:
+                mask1[mask1 == nn] = -1
+
+            sizes = ndimage.sum(1, mask2, range(np.nanmax(mask2)+1))
+            for nn in [x for x in range(1,len(sizes)) if sizes[x] < min_points]:
+                mask2[mask2 == nn] = -1
+
+        ##
+        ## Each overlap must necessarily be one LPO against another single LPO.
+        ##
+        overlap = np.logical_and(mask1 > -1, mask2 > -1)
+        label_im, nb_labels = ndimage.label(overlap)
+
+        ########################################################################
+        ## Construct overlapping points "look up table" array.
+        ## Then, we will use this array as a look up table for specific LPOs.
+        #           -----------> objid2
+        #   |
+        #   |
+        #   |
+        #   v
+        # objid1
+        #
+
+        overlapping_npoints = np.zeros([len(objid1), len(objid2)])
+        overlapping_frac1 = np.zeros([len(objid1), len(objid2)])
+        overlapping_frac2 = np.zeros([len(objid1), len(objid2)])
+
+        for nn in range(1,nb_labels+1):
+            #print(str(nn) + ' of ' + str(nb_labels) + '.')
+            ## Figure out which LPOs this represents.
+            ii = int(ndimage.maximum(mask1, label_im, nn))
+            jj = int(ndimage.maximum(mask2, label_im, nn))
+
+            overlapping_npoints[ii,jj] = ndimage.sum(overlap, label_im, nn)
+            overlapping_frac1[ii,jj] = overlapping_npoints[ii,jj] / np.sum(mask1==ii)
+            overlapping_frac2[ii,jj] = overlapping_npoints[ii,jj] / np.sum(mask2==jj)
+        ########################################################################
+
+
+        ## Keep track arrays.
+        already_connected_objid_list = [] # Keep track of previously connected objids, for split detection.
+        append_branch_list = [] # For splits, I will have to add branches to previous points.
+                                # This will be a list of tuples, each like (jj, branch_to_append).
+
+
+        ##
+        ## Loop over each of the LPO indices (e.g., LPT array rows)
+        ## that were previously identified for this time.
+        ## 1) Figure out which "previous time" LPT indices overlap.
+        ## 2) Link the previous LPT Indices to the group.
+        ##
+
+        for ii in this_time_idx:
+            this_objid = LPT[ii][1]
+            idx1 = int(str(this_objid)[-4:])
+
+            ## 1) Figure out which "previous time" LPT indices overlap.
+            matches = []
+            for jj in prev_time_idx:
+                prev_objid = LPT[jj][1]
+                idx2 = int(str(prev_objid)[-4:])
+
+                n_overlap = overlapping_npoints[idx1,idx2]
+                frac1 = overlapping_frac1[idx1,idx2]
+                frac2 = overlapping_frac2[idx1,idx2]
+
+                if n_overlap >= options['min_overlap_points']:
+                    matches.append(jj)
+                elif 1.0*frac1 > options['min_overlap_frac']:
+                    matches.append(jj)
+                elif 1.0*frac2 > options['min_overlap_frac']:
+                    matches.append(jj)
+            if verbose:
+                print((str(this_objid), matches))
+
+            ## 2) Link the previous LPT Indices to the group.
+            if len(matches) < 1: # No overlaps with prior tracks. Therefore, this begins a new group.
+                if verbose:
+                    print('Beginning new LPT group: ' + str(next_lpt_group_id))
+                LPT[ii][2] = next_lpt_group_id
+                LPT[ii][3] = 1 # This is the beginning of a track.
+                BRANCHES[ii] = 1 # This is the first branch of the LPT. (e.g., 2**0)
+                next_lpt_group_id += 1
+            else:
+                n_match = 0
+                for match in matches:
+                    if verbose:
+                        print(' --> with: ' + str(LPT[match][1]) + ", group #" + str(LPT[match][2]))
+                    n_match += 1
+                    ## I found at least one match! Note: for merging cases,
+                    ## each of the matches will be addressed in this loop.
+                    ## If no matches were found, this loop just gets skipped.
+
+                    ## If only one match, this is an easy one.
+                    if n_match == 1:
+                        if LPT[match][1] in already_connected_objid_list:
+                            ## OK, This is a split situation!
+                            # I need a new branch.
+
+                            LPT[ii][2] = LPT[match][2] # assign the same group.
+                            LPT[match][5] = 1 # Identify the split point
+
+                            ## Branches are trickier.
+                            ## I will need to make a copy of each of the pre-existing branches.
+                            for old_branch in get_group_branches_as_int_list(BRANCHES[match]):
+                                new_branch = get_group_max_branch(LPT, BRANCHES, LPT[match][2]) + 1
+                                BRANCHES[ii] = append_branch(BRANCHES[ii], new_branch)  # Start with a fresh, new branch.
+                                                                                  # Note: I start with branches = 0 here.
+                                                                                  # LPT[ii,6] should be 0 before appending.
+
+                                for dddd in [x for x in range(len(BRANCHES)) if LPT[x,2] == LPT[ii,2] and LPT[x,0] <= LPT[match,0] and (BRANCHES[x] & old_branch)]:
+                                    #append_branch_list.append((dddd,new_branch)) # Append new branch to splitting point.
+                                    BRANCHES[dddd] = append_branch(BRANCHES[dddd], new_branch)
+
+                        else:
+                            LPT[ii][2] = LPT[match][2] # assign the same group.
+                            BRANCHES[ii] = BRANCHES[match] # assign the same group.
+                            already_connected_objid_list.append(LPT[match][1])
+
+
+                    else:
+                        ## This is a merger case!
+                        ##   Assign all entries to the group we already have.
+                        ##   (This will result in skipping some group numbers.)
+                        old_group = LPT[match][2]
+                        new_group = LPT[ii][2] # I already have a group!
+                        if verbose:
+                            print('Merger between groups: ' + str(old_group) + ' and ' + str(new_group) + '.')
+
+                        if old_group == new_group:
+                            print('Re-combine case! No new groups to create.')
+                        else:
+                            idx_old_group = np.where(LPT[:,2] == old_group)[0]
+
+                            print(idx_old_group)
+                            # As far as branches, assign new ones as needed.
+                            # Bitwise shift the branches in old_group
+                            print((branches_binary_str4(BRANCHES[match]),branches_binary_str4(BRANCHES[ii])))
+                            for idx in idx_old_group:
+                                BRANCHES[idx] = BRANCHES[idx] << get_group_max_branch(LPT, BRANCHES, new_group)
+                            print((branches_binary_str4(BRANCHES[match]),branches_binary_str4(BRANCHES[ii])))
+                            LPT[idx_old_group, 2] = new_group ## Gotta do group last, othwise branches above won't work out.
+
+                        BRANCHES[ii] = BRANCHES[ii] | BRANCHES[match]
+                        LPT[match][4] = 0 # this one got matched, so it's not a track end point.
+                                          # (NOTE: Intially the entire end column was set to 1.)
+
+
+    return (LPT, BRANCHES)
+
+
+############################################################################
+############################################################################
+############################################################################
+
 
 def append_branch(branches_binary_int, new_branch_to_append):
     """
@@ -594,15 +916,19 @@ def overlap_forward_backward(LPT1, LPT2, BRANCHES1, BRANCHES2, options, verbose=
         unique_lpt_groups3 = np.unique(LPT3[:,2]) # Changes each iteration.
 
         for this_lpt_group3 in unique_lpt_groups3:
-            print((str(this_lpt_group3) + ' of ' + str(np.max(unique_lpt_groups3))), flush=True)
-            #idx_this_lpt_group3 = np.where(get_col(LPT3,2) == this_lpt_group3)[0]
             idx_this_lpt_group3 = [x for x in range(len(LPT3)) if LPT3[x][2] == this_lpt_group3]
-
-            #objid_in_this_lpt_group3 = LPT3[idx_this_lpt_group3 , 1]
             objid_in_this_lpt_group3 = LPT3[idx_this_lpt_group3, 1]
+
             for this_lpt_group2 in unique_lpt_groups2:
                 idx_this_lpt_group2 = np.where(LPT2[:,2] == this_lpt_group2)[0]
                 objid_in_this_lpt_group2 = LPT2[idx_this_lpt_group2 , 1]
+
+                ## If they never overlap in time, don't consider the pair any further.
+                if np.floor(np.max(objid_in_this_lpt_group3)/1000) < np.floor(np.min(objid_in_this_lpt_group2)/1000):
+                    continue
+                if np.floor(np.max(objid_in_this_lpt_group2)/1000) < np.floor(np.min(objid_in_this_lpt_group3)/1000):
+                    continue
+                ## OK, they match in time. Now search for overlapping LP objects.
 
                 if (len(np.intersect1d(objid_in_this_lpt_group3, objid_in_this_lpt_group2)) > 0
                         and len(np.setdiff1d(objid_in_this_lpt_group2, objid_in_this_lpt_group3)) > 0):
@@ -610,15 +936,15 @@ def overlap_forward_backward(LPT1, LPT2, BRANCHES1, BRANCHES2, options, verbose=
                     ## Add the ones from overlapping reversed track
                     LPT3[idx_this_lpt_group2,2] = this_lpt_group3
 
-
                     unique_lpt_groups1 = np.unique(LPT1[idx_this_lpt_group2,2])
                     for this_lpt_group1 in unique_lpt_groups1:
                         idx_this_lpt_group1 = np.where(LPT1[:,2] == this_lpt_group1)[0]
                         LPT3[idx_this_lpt_group1,2] = this_lpt_group3
 
                     #unique_lpt_groups2 = np.delete(unique_lpt_groups2, np.where(unique_lpt_groups2==this_lpt_group2)[0])
-                    print((' ---> '+ str(this_lpt_group2) + ' of ' + str(np.max(unique_lpt_groups2)-1)), flush=True)
-                    print('New Iteration!', flush=True)
+                    if verbose:
+                        print((str(this_lpt_group3) + ' with ' + str(this_lpt_group2) + ' (of ' + str(np.max(unique_lpt_groups2)-1) + ')'), flush=True)
+                        print('New Iteration!', flush=True)
                     more_to_do = True
                     break
             if more_to_do:
@@ -844,6 +1170,10 @@ def lpt_group_array_allow_center_jumps(LPT, options, fmt="/%Y/%m/%Y%m%d/objects_
     LPT2 = LPT.copy() # Make a copy so I don't inadvertantly over-write the input LPT!
 
     more_to_do = True
+
+    if options['center_jump_max_hours'] < 0.001:
+        more_to_do = False
+
     while more_to_do:
         more_to_do = False
 
@@ -965,8 +1295,8 @@ def lpt_split_and_merge(LPT0, BRANCHES0, merge_split_options, options, fmt="/%Y/
             more_to_do = False
             niter+=1
 
-            if niter > 50:
-                print('WARNING! EXCEEDED 50 ITERATIONS AND GIVING UP. THIS SHOULD NOT HAPPEN.')
+            if niter > 1000:
+                print('WARNING! EXCEEDED 1000 ITERATIONS AND GIVING UP. THIS SHOULD NOT HAPPEN.')
                 break
 
             print('------------------------')
@@ -1115,14 +1445,15 @@ def lpt_split_and_merge(LPT0, BRANCHES0, merge_split_options, options, fmt="/%Y/
 
         more_to_do = True
         #more_to_do = False     ## Use this to test turning off "rejoin 2."
+        niter = 0
 
         while more_to_do:
             more_to_do = False
             niter+=1
 
 
-            if niter > 50:
-                print('WARNING! EXCEEDED 50 ITERATIONS AND GIVING UP. THIS SHOULD NOT HAPPEN.')
+            if niter > 1000:
+                print('WARNING! EXCEEDED 1000 ITERATIONS AND GIVING UP. THIS SHOULD NOT HAPPEN.')
                 break
 
             print('------------------------')
@@ -1365,18 +1696,21 @@ def remove_duplicate_branches(LPT0, BRANCHES0):
 
     return BRANCHES
 
-def remove_short_lived_systems(LPT, BRANCHES, minimum_duration_hours, latest_datetime = dt.datetime(2063,4,5,0,0,0)):
+def remove_short_lived_systems(LPT, BRANCHES, minimum_duration_hours, latest_datetime = dt.datetime(2063,4,5,0,0,0), verbose=False):
 
     """
     Remove short duration LPT groups.
     But only up to the latest_datetime.
     """
 
+    n_orig = len(BRANCHES)
+
     latest_timestamp = (latest_datetime - dt.datetime(1970,1,1,0,0,0)).total_seconds()   # .timestamp()
     unique_lpt_groups = np.unique(LPT[:,2])
     lpt_indices_to_keep = np.array([])
 
-    for this_lpt_group in range(len(unique_lpt_groups)):
+    #for this_lpt_group in range(len(unique_lpt_groups)):
+    for this_lpt_group in unique_lpt_groups:
         this_lpt_group_idx = np.where(LPT[:,2] == this_lpt_group)[0]
 
         timestamp_this_group = LPT[this_lpt_group_idx,0]
@@ -1387,9 +1721,12 @@ def remove_short_lived_systems(LPT, BRANCHES, minimum_duration_hours, latest_dat
             lpt_indices_to_keep = np.append(lpt_indices_to_keep, this_lpt_group_idx)
         else:
             duration_this_group_hours = (max_timestamp_this_group - min_timestamp_this_group) / 3600.0
-            print(duration_this_group_hours)
             if duration_this_group_hours > (minimum_duration_hours - 0.01):
                 lpt_indices_to_keep = np.append(lpt_indices_to_keep, this_lpt_group_idx)
+
+    n_keep = len(lpt_indices_to_keep)
+    if verbose:
+        print('Keeping ' + str(n_keep) + ' of ' + str(n_orig) + ' objects.')
 
     LPT2 = LPT[lpt_indices_to_keep.astype('int').tolist(),:]
     BRANCHES2 = [BRANCHES[x] for x in lpt_indices_to_keep.astype('int').tolist()]
