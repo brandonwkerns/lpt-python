@@ -47,7 +47,7 @@ Main settings for lpt
 plotting = {}
 plotting['do_plotting'] = True               # True or False -- Should I make plots?
 plotting['plot_area'] = [50, 200, -30, 30]   # Plotting area for maps.
-plotting['time_lon_range'] = [40, 200]       # Longitude Range for time-longitude plots.
+plotting['time_lon_range'] = [50, 200]       # Longitude Range for time-longitude plots.
 
 ## High level output directories. Images and data will go in here.
 output={}
@@ -57,6 +57,7 @@ output['sub_directory_format'] = '%Y/%m/%Y%m%d'
 
 ## LP Object settings
 lpo_options={}
+lpo_options['do_lpo_calc'] = True
 lpo_options['thresh'] = 12.0                 # LP Objects threshold
 lpo_options['accumulation_hours'] = 72       # Accumulation period for LP objects.
 lpo_options['filter_stdev'] = 20             # Gaussian filter width, in terms of grid points.
@@ -64,8 +65,7 @@ lpo_options['filter_stdev'] = 20             # Gaussian filter width, in terms o
 ## LPT Settings
 lpt_options={}
 lpt_options['do_lpt_calc'] = True
-#lpt_options['do_lpt_calc'] = False
-lpt_options['lpt_history_days'] = 60          # How many days to go back for LPT tracking and time-lon plot.
+lpt_options['lpt_history_days'] = 45          # How many days to go back for LPT tracking and time-lon plot.
 lpt_options['min_overlap_points'] = 4000      # LP object connectivity is based on points
 lpt_options['min_overlap_frac'] = 0.5         # -- OR fraction of either LP object.
 lpt_options['min_lp_objects_points'] = 100    # Disregard LP objects smaller than this.
@@ -75,7 +75,6 @@ lpt_options['center_jump_max_hours'] = 3*24   # How long to allow center jumps
 ## Merging/Splitting settings
 merge_split_options={}
 merge_split_options['allow_merge_split'] = True
-#merge_split_options['allow_merge_split'] = False
 merge_split_options['split_merger_min_hours'] = 72     # Min duration of a split/merging track to separate it.
 
 """
