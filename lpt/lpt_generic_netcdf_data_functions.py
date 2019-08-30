@@ -154,7 +154,6 @@ def lpt_driver(dataset,plotting,output,lpo_options,lpt_options,merge_split_optio
                 os.makedirs(objects_dir, exist_ok = True)
                 objects_fn = (objects_dir + '/objects_' + YMDH)
                 lpt.lptio.lp_objects_output_ascii(objects_fn, OBJ)
-                #if (len(OBJ['n_points']) > 0):
                 lpt.lptio.lp_objects_output_netcdf(objects_fn + '.nc', OBJ)
 
                 """
@@ -228,35 +227,34 @@ def lpt_driver(dataset,plotting,output,lpo_options,lpt_options,merge_split_optio
         ## Remove small LPOs
         LPT0, BRANCHES0 = lpt.helpers.lpt_group_array_remove_small_objects(LPT0, BRANCHES0, options)
 
-        ## Connect forward, then backwards
-        print('Forward...')
-        LPTf, BRANCHESf = lpt.helpers.calc_lpt_group_array(LPT0, BRANCHES0, options, verbose=True)
-        print('Backward...')
-        LPTb, BRANCHESb = lpt.helpers.calc_lpt_group_array(LPT0, BRANCHES0, options, verbose=True, reversed=True)
-
-        ## Overlap forward and backward connections.
-        LPTfb, BRANCHESfb = lpt.helpers.overlap_forward_backward(LPTf, LPTb, BRANCHESf, BRANCHESb, options, verbose=True)
+        ## Connect objects
+        print('Connecting objects...')
+        LPTfb, BRANCHESfb = lpt.helpers.calc_lpt_group_array3(LPT0, BRANCHES0, options, min_points = lpt_options['min_lp_objects_points'], verbose=True)
+        #LPTfb, BRANCHESfb = lpt.helpers.calc_lpt_group_array2(LPT0, BRANCHES0, options, min_points = lpt_options['min_lp_objects_points'], verbose=True)
 
         ## Allow center jumps.
         print(('Allow center jumps up to ' + str(options['center_jump_max_hours']) + ' hours.'))
-        LPT_center_jumps = lpt.helpers.lpt_group_array_allow_center_jumps(LPTfb, options)
+        LPT_center_jumps, BRANCHES_center_jumps = lpt.helpers.lpt_group_array_allow_center_jumps2(LPTfb, BRANCHESfb, options)
+        #LPT_center_jumps = LPTfb.copy()
+        #BRANCHES_center_jumps = BRANCHESfb.copy()
 
         ## Eliminate short duration systems.
         print(('Remove LPT shorter than ' + str(options['min_lpt_duration_hours']) + ' hours.'))
-        LPT_remove_short, BRANCHES_remove_short = lpt.helpers.remove_short_lived_systems(LPT_center_jumps, BRANCHESfb, options['min_lpt_duration_hours']
+        LPT_remove_short, BRANCHES_remove_short = lpt.helpers.remove_short_lived_systems(LPT_center_jumps, BRANCHES_center_jumps, options['min_lpt_duration_hours']
                                 , latest_datetime = latest_lp_object_time)
 
         ## Handle splitting and merging, if specified.
         if merge_split_options['allow_merge_split']:
-            LPT, BRANCHES = lpt.helpers.lpt_group_id_separate_branches(LPT_remove_short, BRANCHES_remove_short, options, verbose=True)
-            LPT, BRANCHES = lpt.helpers.lpt_split_and_merge(LPT, BRANCHES, merge_split_options, options)
+            LPT, BRANCHES = lpt.helpers.lpt_split_and_merge(LPT_remove_short, BRANCHES_remove_short, merge_split_options, options)
+            #LPT = LPT_remove_short.copy()
+            #BRANCHES = BRANCHES_remove_short.copy()
         else:
             LPT = LPT_remove_short.copy()
             BRANCHES = BRANCHES_remove_short.copy()
 
-
-        #BRANCHES = lpt.helpers.reorder_LPT_branches(LPT, BRANCHES)
-        #print(str(BRANCHES))
+        ## Re-order LPT system branches.
+        print('Re-ordering LPT branches.')
+        BRANCHES = lpt.helpers.reorder_LPT_branches(LPT, BRANCHES)
 
         ## Get "timeclusters" tracks.
         print('Calculating LPT properties.')
@@ -284,9 +282,9 @@ def lpt_driver(dataset,plotting,output,lpo_options,lpt_options,merge_split_optio
             timelon_rain = []
             for this_dt in dt_list:
                 if 'sub_area' in dataset.keys():
-                    DATA_RAW = dataset['read_function'](this_dt, verbose=dataset['verbose'], area=dataset['sub_area'])
+                    DATA_RAW = read_generic_netcdf_at_datetime(this_dt, data_dir=dataset['raw_data_parent_dir'], fmt=dataset['file_name_format'], verbose=dataset['verbose'], area=dataset['sub_area'])
                 else:
-                    DATA_RAW = dataset['read_function'](this_dt, verbose=dataset['verbose'])
+                    DATA_RAW = read_generic_netcdf_at_datetime(this_dt, data_dir=dataset['raw_data_parent_dir'], fmt=dataset['file_name_format'], verbose=dataset['verbose'])
 
                 lat_idx, = np.where(np.logical_and(DATA_RAW['lat'] > -15.0, DATA_RAW['lat'] < 15.0))
                 timelon_rain.append(np.mean(np.array(DATA_RAW['precip'][lat_idx,:]), axis=0))
