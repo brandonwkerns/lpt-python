@@ -154,19 +154,17 @@ def lpt_real_time_driver_forecasts(dataset,plotting,output,lpo_options,lpt_optio
         ## Remove small LPOs
         LPT0, BRANCHES0 = lpt.helpers.lpt_group_array_remove_small_objects(LPT0, BRANCHES0, options, fmt=fmt)
 
-        ## Connect forward, then backwards
+        ## Connect objects
         print('Connecting objects...')
-        LPTfb, BRANCHESfb = lpt.helpers.calc_lpt_group_array2(LPT0, BRANCHES0, options, min_points = lpt_options['min_lp_objects_points'], verbose=True, fmt=fmt)
-        lpt.lptio.lpt_systems_group_array_output_ascii('test0.txt', LPTfb, BRANCHESfb)
+        LPTfb, BRANCHESfb = lpt.helpers.calc_lpt_group_array3(LPT0, BRANCHES0, options, min_points = lpt_options['min_lp_objects_points'], verbose=True, fmt=fmt)
 
         ## Allow center jumps.
         print(('Allow center jumps up to ' + str(options['center_jump_max_hours']) + ' hours.'))
-        LPT_center_jumps = lpt.helpers.lpt_group_array_allow_center_jumps(LPTfb, options, fmt=fmt)
+        LPT_center_jumps, BRANCHES_center_jumps = lpt.helpers.lpt_group_array_allow_center_jumps2(LPTfb, BRANCHESfb, options, fmt=fmt)
 
         ## Eliminate short duration systems.
         print(('Remove LPT shorter than ' + str(options['min_lpt_duration_hours']) + ' hours.'))
-        LPT_remove_short, BRANCHES_remove_short = lpt.helpers.remove_short_lived_systems(LPT_center_jumps, BRANCHESfb, options['min_lpt_duration_hours'])
-        #                        , latest_datetime = latest_lp_object_time - dt.timedelta(hours=options['min_lpt_duration_hours']))
+        LPT_remove_short, BRANCHES_remove_short = lpt.helpers.remove_short_lived_systems(LPT_center_jumps, BRANCHES_center_jumps, options['min_lpt_duration_hours'])
 
 
 
